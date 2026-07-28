@@ -65,6 +65,36 @@ only honest way to judge a swipe interaction.
 cd backend && .venv/Scripts/python -m pytest tests -q      # 62 tests
 ```
 
+### A temporary public URL (for testing on a real phone)
+
+A LAN address won't do: `http://192.168.x.x` is not a *secure context*, so the native
+share sheet and the clipboard API are both unavailable. Tunnelling an https origin is what
+makes the share flow testable on a phone.
+
+Three terminals:
+
+```bash
+# 1. API
+cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000
+
+# 2. Production build, served with /api proxied to the API so it's all one origin
+cd frontend
+VITE_API_BASE_URL=/api npm run build      # PowerShell: $env:VITE_API_BASE_URL="/api"
+npm run preview -- --port 4173
+
+# 3. Public https URL
+cloudflared tunnel --url http://127.0.0.1:4173
+```
+
+Because everything is one origin, CORS never enters into it, and share links are built
+from the tunnel origin so they work for whoever you send them to.
+
+**This exposes your local app and API to the public internet** for as long as the tunnel
+runs. The quick-tunnel URL is random and unlisted, the data is fake, and the endpoints are
+rate limited — but stop the `cloudflared` process when you're done. The URL changes every
+time you restart it. Note also that `public/_headers` is a Netlify feature, so the CSP is
+*not* applied on a tunnelled preview.
+
 ---
 
 ## How it fits together
