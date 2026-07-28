@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover so the layout can reach under the notch and home indicator. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B0B11" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <title>Vegas This Weekend</title>
+    <meta
+      name="description"
+      content="Swipe through what's happening in Las Vegas this weekend. Save what looks good, share it with your group. No account needed."
+    />
+    <meta property="og:title" content="Vegas This Weekend" />
+    <meta
+      property="og:description"
+      content="Swipe through what's happening in Las Vegas this weekend."
+    />
+    <meta property="og:type" content="website" />
+
+    <!-- Cookieless and GDPR-compliant by default; ignores localhost, so dev is silent. -->
+    <script
+      defer
+      data-domain="vegasthisweekend.com"
+      src="https://plausible.io/js/script.js"
+    ></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

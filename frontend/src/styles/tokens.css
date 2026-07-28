@@ -1,0 +1,96 @@
+/* Design tokens.
+
+   Vegas at night, held back on purpose: a near-black base, one hot accent that only
+   ever means "save", and colour used to tell categories apart rather than to decorate. */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, darkest to lightest. */
+  --ink-950: #06060a;
+  --ink-900: #0b0b11;
+  --ink-850: #101018;
+  --ink-800: #16161f;
+  --ink-750: #1d1d28;
+  --ink-700: #262633;
+  --ink-600: #34343f;
+
+  --text-hi: #f4f3f7;
+  --text-mid: #a5a3b4;
+  --text-low: #6c6a7c;
+
+  /* Accents. Pink is reserved for the save action so it always reads as one thing. */
+  --pink: #ff2e88;
+  --pink-soft: rgba(255, 46, 136, 0.16);
+  --cyan: #2ee6e0;
+  --cyan-soft: rgba(46, 230, 224, 0.14);
+  --amber: #ffb43d;
+  --amber-soft: rgba(255, 180, 61, 0.14);
+  --red: #ff5470;
+  --red-soft: rgba(255, 84, 112, 0.16);
+
+  --font-display: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --step--1: 0.78rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.3125rem;
+  --step-3: 1.625rem;
+  --step-4: 2rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 18px 44px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snap: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Set by the layout so fixed chrome can respect the notch and home indicator. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Per-vibe colour pairs. These drive both the generated posters and the category chips,
+   so a category looks the same everywhere it appears. */
+:root {
+  --vibe-nightlife-1: #ff2e88;
+  --vibe-nightlife-2: #7b3be8;
+  --vibe-music-1: #8b5cf6;
+  --vibe-music-2: #3b4fe8;
+  --vibe-food_drink-1: #ff9f1c;
+  --vibe-food_drink-2: #e8433b;
+  --vibe-shows-1: #2ee6e0;
+  --vibe-shows-2: #2b7de8;
+  --vibe-sports-1: #3ddc84;
+  --vibe-sports-2: #12a5a0;
+  --vibe-outdoors-1: #ff8354;
+  --vibe-outdoors-2: #d6456f;
+  --vibe-family-1: #4ad7c0;
+  --vibe-family-2: #6fc93a;
+  --vibe-adult-1: #e8306f;
+  --vibe-adult-2: #6b2bb5;
+  --vibe-local-1: #4f8cff;
+  --vibe-local-2: #2ec8e6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

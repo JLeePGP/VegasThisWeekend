@@ -1,0 +1,15 @@
+fastapi>=0.118,<1.0
+uvicorn[standard]>=0.37,<1.0
+sqlalchemy>=2.0.44,<2.1
+pydantic>=2.12,<3.0
+pydantic-settings>=2.11,<3.0
+slowapi>=0.1.9,<0.2
+python-dotenv>=1.1,<2.0
+
+# zoneinfo has no system tz database on Windows; Vegas-local date math needs this.
+tzdata>=2025.2
+
+# Postgres driver for Railway. Local dev falls back to SQLite and does not need it,
+# so install with `pip install -r requirements.txt` on Linux/prod and
+# `pip install -r requirements-dev.txt` locally if a wheel is unavailable.
+psycopg[binary]>=3.2.10,<4.0
