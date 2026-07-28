@@ -87,6 +87,16 @@ a file, so it never lands in the repo.
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+An API key is **not** the same as a Claude Pro subscription — Pro covers claude.ai, while
+API usage is billed separately against credits on your Anthropic Console account. Create
+the key at console.anthropic.com.
+
+Extraction runs on **Sonnet 5** (`ANTHROPIC_MODEL`). This is structured field-pulling with
+a few judgment calls, not long-horizon agentic work, so Sonnet tier is the right fit at
+roughly a third of Opus 5's cost. `thinking` is set to adaptive explicitly rather than
+left to the default, because that default differs by model — on Sonnet 4.6, omitting it
+means no thinking at all, which would quietly remove reasoning from the date arithmetic.
+
 Restart the API. The panel's header badge flips to `extraction on`. Without it, the URL
 box is disabled and the form below works exactly as normal.
 
@@ -298,8 +308,13 @@ match it, and `img-src` to the R2 bucket domain. The CSP currently names
 - **Extraction has never run against a live page.** The code path is built and unit
   tested against mocked responses, but no `ANTHROPIC_API_KEY` has been configured yet, so
   its behaviour on a real Eventbrite or venue page is unverified.
-- **Extraction costs money per paste** — roughly $10–20/month at 30–50 events a week on
-  Opus 5. `ANTHROPIC_MODEL` is configurable if that needs tuning.
+- **Extraction costs money per paste** — roughly **$9/month** at 30–50 events a week on
+  Sonnet 5 (~$14 once its introductory pricing ends on 31 Aug 2026). Opus 5 would be ~$23
+  for no benefit on this task. `ANTHROPIC_MODEL` is configurable.
+- **`effort` is the next cost lever and is untuned.** It defaults to `high`; `medium`
+  would likely cut thinking tokens with no quality loss on a task this well specified.
+  Deliberately left alone until a live extraction can be measured — guessing at it
+  without data would just be a different kind of wrong.
 - **A series is generated once.** Editing a residency means editing each night. Fine at
   26 occurrences; it would want a real recurrence model before it wants a hundred.
 - **Offset pagination** can skip or repeat an item if an event expires mid-scroll. The

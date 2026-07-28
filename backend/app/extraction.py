@@ -204,6 +204,12 @@ def extract_event(*, url: str | None = None, text: str | None = None) -> Extract
         "max_tokens": MAX_TOKENS,
         "system": SYSTEM_PROMPT,
         "output_format": ExtractionResult,
+        # Set explicitly rather than relying on the default, because the default differs
+        # by model: on Sonnet 5 omitting this runs adaptive thinking, on Sonnet 4.6 it
+        # runs none at all. ANTHROPIC_MODEL is configurable, so behaviour must not depend
+        # on which model it happens to name — and the date arithmetic is exactly the step
+        # that needs the reasoning.
+        "thinking": {"type": "adaptive"},
     }
     if url:
         # web_fetch only retrieves URLs already present in the conversation, so the

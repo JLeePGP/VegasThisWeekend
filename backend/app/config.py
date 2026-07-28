@@ -29,7 +29,10 @@ class Settings(BaseSettings):
     # --- Admin panel + AI extraction ---
     admin_token: str = ""
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-opus-5"
+    # Extraction is structured field-pulling with a few judgment calls, not long-horizon
+    # agentic work, so Sonnet tier is the right fit — roughly a third of Opus 5's cost at
+    # this volume. Override per-deployment if a page type turns out to need more.
+    anthropic_model: str = "claude-sonnet-5"
     eventbrite_api_key: str = ""
 
     # Cloudflare R2, via its S3-compatible API. Every field must be set before image
