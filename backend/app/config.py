@@ -26,10 +26,24 @@ class Settings(BaseSettings):
     # Comma-separated exact origins. Never a wildcard in production.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    # Phase 2 (admin panel + AI extraction). Declared now so deploy config is complete.
+    # --- Admin panel + AI extraction ---
     admin_token: str = ""
     anthropic_api_key: str = ""
+    anthropic_model: str = "claude-opus-5"
     eventbrite_api_key: str = ""
+
+    # Cloudflare R2, via its S3-compatible API. Every field must be set before image
+    # mirroring turns on; until then events keep their generated posters.
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket: str = ""
+    r2_public_base_url: str = ""
+
+    # Ceiling on how many occurrences one recurring event may generate in a single go.
+    max_series_occurrences: int = 26
+    # Refuse to mirror anything larger; a hostile page can advertise a huge image.
+    max_image_bytes: int = 10_000_000
 
     share_ttl_days: int = 30
     max_share_events: int = 20
@@ -52,6 +66,31 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
+
+    @property
+    def admin_enabled(self) -> bool:
+        """Without a token the admin routes refuse every request rather than run open."""
+        return bool(self.admin_token)
+
+    @property
+    def extraction_enabled(self) -> bool:
+        return bool(self.anthropic_api_key)
+
+    @property
+    def r2_enabled(self) -> bool:
+        return all(
+            (
+                self.r2_account_id,
+                self.r2_access_key_id,
+                self.r2_secret_access_key,
+                self.r2_bucket,
+                self.r2_public_base_url,
+            )
+        )
+
+    @property
+    def r2_endpoint_url(self) -> str:
+        return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
 
 
 @lru_cache

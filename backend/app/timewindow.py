@@ -44,6 +44,22 @@ def now_vegas() -> datetime:
     return datetime.now(VEGAS_TZ)
 
 
+def vegas_local_to_utc(naive_local: datetime) -> datetime:
+    """Interpret a naive wall-clock time as Las Vegas local and return it in UTC.
+
+    This is the only place a local time becomes an absolute one. Extraction returns
+    naive local strings precisely so that this conversion happens here, in code with
+    tests, rather than inside a model's head.
+
+    On the spring-forward morning a wall-clock time between 02:00 and 03:00 does not
+    exist; Python resolves it rather than raising, which is the right call for event
+    listings — nothing real is scheduled in that hour.
+    """
+    if naive_local.tzinfo is not None:
+        raise ValueError("Expected a naive local datetime, got an aware one.")
+    return naive_local.replace(tzinfo=VEGAS_TZ).astimezone(timezone.utc)
+
+
 def listing_date(moment: datetime) -> date:
     """The day an event at this moment is filed under, per the 5am rollover."""
     local = moment.astimezone(VEGAS_TZ)

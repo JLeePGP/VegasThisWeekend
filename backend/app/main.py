@@ -10,9 +10,8 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from .config import get_settings
-from .db import Base, engine
 from .limiter import limiter
-from .routers import events, share
+from .routers import admin, events, share
 
 settings = get_settings()
 
@@ -21,9 +20,9 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     if settings.is_production and not settings.cors_origin_list:
         raise RuntimeError("CORS_ORIGINS must be set in production.")
-    # The v1 schema has no migration history yet, so create_all is enough. Alembic
-    # takes over when the admin panel starts changing tables in flight.
-    Base.metadata.create_all(bind=engine)
+    # Alembic owns the schema — `alembic upgrade head` runs on deploy (see Procfile).
+    # The app deliberately does not create tables at boot: once real events exist, a
+    # process that quietly reshapes the database on startup is a liability.
     yield
 
 
@@ -43,15 +42,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    # No cookies and no browser-side auth, so credentialed requests are never needed.
+    # No cookies anywhere. The admin panel sends a bearer token in a header, which is
+    # not a credential in the CORS sense, so this stays false.
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    # PUT and DELETE are for the admin routes; Authorization carries the admin token.
+    # Without that header in the allowlist the browser strips it and every admin call
+    # fails as unauthenticated.
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
     max_age=600,
 )
 
 app.include_router(events.router)
 app.include_router(share.router)
+app.include_router(admin.router)
 
 
 @app.get("/health", tags=["meta"])

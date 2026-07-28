@@ -3,9 +3,8 @@
 Mobile-first Las Vegas event discovery. Open it, swipe through what's on, save what looks
 good, share it with your group. No account, no planning session.
 
-**Phase 1 (this build): the consumer app.** Swipe stack, filters, saved list, share links,
-insider tips — running against placeholder events.
-**Phase 2 (next): the admin panel** — paste a URL, Claude extracts the event, John confirms.
+**Phase 1: the consumer app.** Swipe stack, filters, saved list, share links, insider tips.
+**Phase 2: the admin panel** — paste a URL, Claude drafts the event, John confirms and saves.
 
 ---
 
@@ -14,11 +13,18 @@ insider tips — running against placeholder events.
 | Piece | State |
 |---|---|
 | Swipe stack, filters, saved list, share links, insider tips | Built and verified in-browser |
-| Backend API + 62 tests | Passing |
-| Event data | **Placeholder.** Fictional venues, flagged `is_sample` |
-| Admin panel / AI URL extraction | Phase 2, not started |
+| Admin panel: manual entry, event list, edit, tips | Built and verified in-browser |
+| AI URL extraction | Built; **needs `ANTHROPIC_API_KEY` to run** |
+| Image mirroring to Cloudflare R2 | Built; **needs R2 credentials to run** |
+| Backend API + 161 tests | Passing |
+| Schema migrations (Alembic) | In place; `create_all` retired |
+| Event data | **Still placeholder.** Fictional venues, flagged `is_sample` |
 | Eventbrite integration | Config placeholder only |
 | Deployed | No — Railway/Netlify accounts not yet created |
+
+Both credential-gated features degrade rather than break: without an Anthropic key the
+admin panel is manual-entry only and says so; without R2 the event saves and keeps its
+generated poster.
 
 Every seeded event is invented and every venue name is fictional. While any sample event
 is in the database the API reports `sample_data: true` and the app shows a banner saying
@@ -59,10 +65,49 @@ npm run dev
 The dev server also binds to your LAN, so you can open it on a real phone — which is the
 only honest way to judge a swipe interaction.
 
+### Admin panel — http://127.0.0.1:5174
+
+Runs on your machine only; it is never deployed. It talks to whichever API
+`VITE_API_BASE_URL` names — the local backend while you're testing, the Railway origin
+once you're seeding real events.
+
+```bash
+cd admin
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Sign in with the `ADMIN_TOKEN` from `backend/.env`. It is stored in the browser, not in
+a file, so it never lands in the repo.
+
+**To switch on AI extraction**, put your key in `backend/.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Restart the API. The panel's header badge flips to `extraction on`. Without it, the URL
+box is disabled and the form below works exactly as normal.
+
+**To switch on image mirroring**, create an R2 bucket and fill in all five `R2_*` values
+in `backend/.env`. Until then events keep the client-side generated posters.
+
 ### Tests
 
 ```bash
-cd backend && .venv/Scripts/python -m pytest tests -q      # 62 tests
+cd backend && .venv/Scripts/python -m pytest tests -q      # 161 tests
+```
+
+### Migrations
+
+Alembic owns the schema; the app no longer creates tables at boot, and Railway runs
+`alembic upgrade head` on every deploy via the `Procfile`.
+
+```bash
+cd backend
+.venv/Scripts/alembic upgrade head                          # apply
+.venv/Scripts/alembic revision --autogenerate -m "what changed"
 ```
 
 ### A temporary public URL (for testing on a real phone)
@@ -100,20 +145,33 @@ time you restart it. Note also that `public/_headers` is a Netlify feature, so t
 ## How it fits together
 
 ```
-React (Vite) ──HTTPS──> FastAPI ──> PostgreSQL
-   Netlify               Railway      Railway
+React (Vite) ──HTTPS──> FastAPI ──> PostgreSQL          Admin (Vite)
+   Netlify               Railway      Railway            your machine
+                            ▲                                 │
+                            └─────── bearer token ────────────┘
 ```
+
+The admin panel is a separate app that is never deployed. It runs locally and writes to
+the live API, so the `/admin` routes are reachable from the internet and the token — not
+network location — is what guards them.
 
 ```
 backend/
   app/
     main.py          app wiring, CORS, rate limiting
     models.py        Event, InsiderTip, ShareList
-    schemas.py       request/response contracts
+    schemas.py       public request/response contracts
+    schemas_admin.py admin contracts (local times cross this boundary)
     enums.py         the closed vocabularies clients may send
     timewindow.py    Vegas-local date logic  <- read this one first
     tips.py          matching curated tips onto events
-    routers/         events.py, share.py
+    auth.py          admin bearer token
+    extraction.py    Claude → a draft event
+    recurrence.py    a residency → one row per night
+    duplicates.py    "have I already added this?"
+    images.py        mirroring images to R2 (and the SSRF guards)
+    routers/         events.py, share.py, admin.py
+  alembic/           schema migrations
   seed_sample_events.py
   tests/
 
@@ -151,6 +209,29 @@ Cloudflare R2.
 **Local dev uses SQLite, production uses Postgres.** Column types are deliberately
 portable so the same models serve both, with no dialect-specific code.
 
+**The model never does timezone arithmetic.** Extraction returns naive Vegas wall-clock
+strings and the admin form posts the same, because `datetime-local` inputs emit exactly
+that format. The single conversion to UTC happens server-side in code that has tests —
+not in a model's head, and not in a browser.
+
+**Extraction returns a draft, never a row.** Nothing Claude produces reaches the database
+without passing through the review form. Fields the model had to guess at are returned in
+`uncertain_fields` and highlighted in the form rather than silently accepted.
+
+**Page content is data, not instructions.** A venue page is untrusted input that could
+contain text aimed at the model. Three independent controls: the output schema constrains
+the shape, URL fields are checked against a scheme allowlist, and a human reviews every
+draft. None of the three is sufficient alone.
+
+**A residency is stored as the nights it actually runs.** The swipe stack, the date
+filters and the share snapshots all assume concrete rows, so recurrence is expanded at
+save time rather than modelled as a rule. Occurrences are generated in wall-clock time, so
+a 10pm night stays at 10pm across a DST change.
+
+**Duplicate detection warns, never blocks.** Two genuinely different events can share a
+venue and a start time — two rooms, two stages — so a collision returns 409 with what it
+hit and the decision stays with John.
+
 ### Security posture
 
 - No secret ever reaches the browser; all external calls go through the backend.
@@ -164,6 +245,13 @@ portable so the same models serve both, with no dialect-specific code.
   explicitly create a share link.
 - CSP, `X-Frame-Options`, and friends ship in `frontend/public/_headers`.
 - Client IPs are used transiently as rate-limit keys and are never stored or logged.
+- Admin routes require a bearer token, compared in constant time. An unset `ADMIN_TOKEN`
+  disables them with a 503 rather than leaving them open.
+- The admin token lives in the browser's `localStorage`, never in a committed file.
+- Image mirroring is a server-side fetch of an attacker-influenced URL, so every hop is
+  checked to resolve to a public address, redirects are followed by hand rather than by
+  the HTTP client, the content type is allowlisted and the body is capped mid-stream.
+  Cloud metadata endpoints and private ranges are refused — see `tests/test_extraction.py`.
 
 ---
 
@@ -177,13 +265,18 @@ Neither account exists yet. When they do:
 |---|---|
 | `ENVIRONMENT` | `production` |
 | `DATABASE_URL` | injected by the Postgres plugin |
-| `CORS_ORIGINS` | `https://vegasthisweekend.com` |
-| `ADMIN_TOKEN` | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
-| `ANTHROPIC_API_KEY` | Phase 2 |
+| `CORS_ORIGINS` | `https://vegasthisweekend.com,http://localhost:5174` |
+| `ADMIN_TOKEN` | a **different** value from your local one — `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `ANTHROPIC_API_KEY` | for URL extraction |
+| `R2_ACCOUNT_ID` … `R2_PUBLIC_BASE_URL` | all five, for image mirroring |
 | `EVENTBRITE_API_KEY` | when sourced |
 
-`Procfile` holds the start command. Setting `ENVIRONMENT=production` also switches off
-`/docs` and `/openapi.json`.
+`localhost:5174` is in the production CORS list on purpose: the admin panel runs on your
+machine and writes to the deployed API. CORS is not the control here — the bearer token
+is; this only stops the browser refusing the request before it is sent.
+
+`Procfile` runs `alembic upgrade head` before starting the server, so a deploy applies
+migrations. Setting `ENVIRONMENT=production` also switches off `/docs` and `/openapi.json`.
 
 **Netlify (frontend)** — base directory `frontend/`, build `npm run build`, publish `dist`.
 Set `VITE_API_BASE_URL` to the Railway API origin. `netlify.toml` covers the SPA redirect
@@ -199,9 +292,16 @@ match it, and `img-src` to the R2 bucket domain. The CSP currently names
 
 ## Known gaps
 
-- **`create_all` builds the schema, there are no migrations.** Fine while the shape is
-  settled and the data is disposable; Alembic should land before the admin panel starts
-  changing tables under live data.
+- **Login-walled sources cannot be fetched by anything.** Instagram and Facebook posts
+  will not resolve server-side, by Claude or by us. That is what the "paste text instead"
+  box is for — it is the only path for a real slice of the PRD's stated sources.
+- **Extraction has never run against a live page.** The code path is built and unit
+  tested against mocked responses, but no `ANTHROPIC_API_KEY` has been configured yet, so
+  its behaviour on a real Eventbrite or venue page is unverified.
+- **Extraction costs money per paste** — roughly $10–20/month at 30–50 events a week on
+  Opus 5. `ANTHROPIC_MODEL` is configurable if that needs tuning.
+- **A series is generated once.** Editing a residency means editing each night. Fine at
+  26 occurrences; it would want a real recurrence model before it wants a hundred.
 - **Offset pagination** can skip or repeat an item if an event expires mid-scroll. The
   client dedupes by id, so the visible symptom is at worst a slightly short page.
 - **Rate limiting is in-process**, so limits are per-instance. Fine at one instance; a

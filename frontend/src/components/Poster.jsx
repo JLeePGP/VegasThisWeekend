@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { vibeLabel } from '../constants';
 
 // Sample events carry no image, and real ones will not always have a good one either.
@@ -14,10 +15,24 @@ function hashOf(text) {
 }
 
 export default function Poster({ event, compact = false }) {
-  if (event.image_url) {
+  // An image URL that stops resolving must degrade to the generated poster rather than
+  // a broken-image icon. Real events point at R2, but an unmirrored venue URL can die
+  // at any time — which is the entire reason R2 exists.
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => setImageFailed(false), [event.image_url]);
+
+  if (event.image_url && !imageFailed) {
     return (
       <div className="poster">
-        <img className="poster__img" src={event.image_url} alt="" loading="lazy" decoding="async" />
+        <img
+          className="poster__img"
+          src={event.image_url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setImageFailed(true)}
+        />
       </div>
     );
   }

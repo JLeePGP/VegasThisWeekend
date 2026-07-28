@@ -6,8 +6,23 @@ pydantic-settings>=2.11,<3.0
 slowapi>=0.1.9,<0.2
 python-dotenv>=1.1,<2.0
 
+# Schema migrations. Took over from create_all when the admin panel arrived and the
+# database stopped being disposable.
+alembic>=1.16,<2.0
+
 # zoneinfo has no system tz database on Windows; Vegas-local date math needs this.
 tzdata>=2025.2
+
+# AI URL extraction. Imported lazily, so the API still boots without a key set.
+anthropic>=0.116,<1.0
+
+# Mirroring event images into Cloudflare R2 via its S3-compatible API. Also lazy —
+# unconfigured R2 means events keep their generated posters.
+boto3>=1.40,<2.0
+
+# Fetching those images. Already present transitively via anthropic; pinned directly
+# because images.py imports it in its own right.
+httpx>=0.28,<1.0
 
 # Postgres driver for Railway. Local dev falls back to SQLite and does not need it,
 # so install with `pip install -r requirements.txt` on Linux/prod and
