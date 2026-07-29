@@ -323,3 +323,52 @@ match it, and `img-src` to the R2 bucket domain. The CSP currently names
   second one needs shared storage.
 - **"Return visits" is deliberately not instrumented** — cookieless analytics and no
   accounts means there is no honest way to measure it until v2 brings accounts.
+
+---
+
+## Backlog
+
+### Two new filters: Sober and Fitness
+
+Wanted, not yet built. They look like one task and are actually two, because they are
+different *kinds* of thing — and getting that wrong is the main risk here.
+
+**Fitness is a vibe.** It answers "what kind of event is this", the same question every
+existing vibe answers, and it fills a real hole: an indoor yoga class or a gym event fits
+none of the current nine (`outdoors` only works if it happens to be outside, and `local`
+is a stretch). Adding it is additive and cheap:
+
+- `Vibe.FITNESS` in `backend/app/enums.py`
+- the matching entry in `admin/src/constants.js` and `frontend/src/constants.js`
+- a `--vibe-fitness-1/-2` colour pair in `frontend/src/styles/tokens.css`, or generated
+  posters for it fall back to grey
+- **no migration** — `Event.vibe` is a `String(32)`, not a database enum
+
+Known wrinkle: an outdoor run club is both `outdoors` and `fitness`, and an event carries
+exactly one vibe. That is an existing limitation of the single-vibe model rather than
+something Fitness introduces, but Fitness will make it visible more often.
+
+**Sober is not a vibe, and must not be added as one.** It is an attribute that cuts
+*across* categories: a sober rave is `nightlife` **and** alcohol-free; a dry comedy night
+is `shows` **and** alcohol-free. Appending `SOBER` to the `Vibe` enum would force an
+event to be either `nightlife` or `sober`, which makes a sober club night — precisely
+what someone using this filter is looking for — impossible to express. It wants its own
+column and its own control:
+
+- `Event.alcohol_free: bool` defaulting to `False`, **which needs the first real Alembic
+  migration** after the baseline
+- an independent query param (`alcohol_free=true`), not another value in the `vibe` list
+- a toggle in the filter sheet, sitting apart from the vibe chips, since it composes with
+  them rather than replacing one
+- a checkbox on the admin form
+
+**Extraction honesty matters here.** A page not mentioning alcohol is not evidence the
+event is alcohol-free. The system prompt should set `alcohol_free` only on an explicit
+signal ("dry", "sober", "alcohol-free", "no bar") and otherwise leave it false, listing
+it in `uncertain_fields` when it is genuinely ambiguous. Guessing wrong in the optimistic
+direction sends someone in recovery to a bar, which is the one failure mode here that
+actually hurts somebody.
+
+Worth doing properly rather than bolting on: sober-curious and recovery audiences are
+badly served in a city built on alcohol, and it is the kind of filter no competing Vegas
+listing site offers.
