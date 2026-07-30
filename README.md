@@ -10,14 +10,16 @@ good, share it with your group. No account, no planning session.
 
 ## Status
 
-**Live as of 29 Jul 2026**, with one thing outstanding — see [BACKLOG.md](BACKLOG.md).
+**Live as of 30 Jul 2026** at `https://vegasthisweekend.com` — HTTPS, `www` redirecting to
+the apex, behind Cloudflare. Open work is in [BACKLOG.md](BACKLOG.md).
 
 | Piece | State |
 |---|---|
 | API | ✅ live — `https://api.vegasthisweekend.com` (Railway) |
 | Database | ✅ Postgres on Railway, migrations applied, **10 real events** |
-| Website | ✅ live — `https://vegasthisweekend.netlify.app` |
-| Website on the real domain | ⏳ DNS correct; **Netlify TLS certificate still provisioning** |
+| Website | ✅ live — `https://vegasthisweekend.com` (Netlify, proxied through Cloudflare) |
+| HTTPS + canonical host | ✅ `http` → `https` 301, `www` → apex 301, HSTS set |
+| Bundle → API cutover | ✅ deployed bundle calls `api.vegasthisweekend.com` only |
 | Swipe stack, filters, saved list, share links, insider tips | ✅ built, verified in-browser |
 | Admin panel: manual entry, list, edit, tips, duplicates, series | ✅ built, verified in-browser |
 | Analytics (9 custom events) | ✅ shipped — **needs the goals registered in Plausible to display** |
