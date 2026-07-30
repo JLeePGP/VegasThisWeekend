@@ -67,9 +67,22 @@ We'll likely do all of it. This is the sequence that avoids rework, not a rankin
 
 ---
 
-## Decisions I need from you
+## Decisions — settled 30 Jul 2026
 
-Three items where I'd build the wrong thing if I guessed.
+All three resolved with John. Recorded so they don't get re-opened by accident.
+
+| Decision | Outcome |
+|---|---|
+| Analytics | **First-party counters; retire Plausible.** Keep Cloudflare's free traffic dashboard alongside. |
+| Bulk extraction | **Build it** — bulk paste → draft queue → human approval. Never auto-publish. |
+| Starting order | **Housekeeping first (C1–C3), then the card rebuild (A1).** |
+
+Consequences worth noting:
+- **B3 changes shape**: it is now *build counters + retire Plausible*, not *make Plausible work*. The nine Plausible goals (previously item 1.4) are **cancelled** — don't register them.
+- **C3 (OG image) gets more urgent**, since it's in the first batch and it's what makes shared links stop previewing as a grey box.
+- **B4 depends on C10** (`effort` tuning) and benefits from the content cap — do the cost measurement as the first step of that build, not after it.
+
+The reasoning behind each is below, kept because the *why* matters more than the *what*.
 
 ### 1. Sober is not a category — even with multi-select
 
