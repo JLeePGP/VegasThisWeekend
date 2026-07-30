@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     max_share_events: int = 20
     page_size: int = 20
 
+    # Whether to believe CF-Connecting-IP / X-Forwarded-For when working out who a
+    # request came from. On because two proxies sit in front of this app in production
+    # and without it every visitor shares one rate-limit bucket. See client_ip.py for
+    # what trusting them costs, and turn it off if the API is ever exposed directly.
+    trust_proxy_headers: bool = True
+
     @property
     def sqlalchemy_url(self) -> str:
         """Normalise Railway's `postgres://` scheme onto the psycopg 3 driver."""

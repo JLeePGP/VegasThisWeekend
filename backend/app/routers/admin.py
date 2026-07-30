@@ -23,6 +23,7 @@ from ..auth import require_admin
 from ..config import get_settings
 from ..db import get_db
 from ..bulk_extraction import BulkExtractionError, collect as collect_batches
+from ..client_ip import client_ip, resolve as resolve_client_sources
 from ..bulk_extraction import parse_urls, submit as submit_batch
 from ..duplicates import find_possible_duplicates
 from ..extraction import ExtractionError, extract_event, parse_local
@@ -347,6 +348,30 @@ def deactivate_event(
     row.is_active = False
     db.commit()
     return AdminEventOut.from_event(row)
+
+
+# ------------------------------------------------------------------ diagnostics
+
+
+@router.get("/diagnostics/client")
+@limiter.limit("30/minute")
+def client_diagnostics(request: Request) -> dict:
+    """What the server thinks the caller's address is, and where it got that from.
+
+    Exists because the alternative was guessing. Rate limiting is keyed on this, and
+    getting it wrong is invisible from outside: every visitor sharing one bucket looks
+    exactly like normal operation until real traffic arrives and starts getting 429s.
+    Being able to ask the deployed API directly turns that into a five-second check.
+    """
+    sources = resolve_client_sources(request)
+    return {
+        "resolved_key": client_ip(request),
+        "trust_proxy_headers": settings.trust_proxy_headers,
+        "sources": sources,
+        # The tell: if this is true, the socket peer is a proxy and keying on it would
+        # have put every visitor in the same bucket.
+        "behind_proxy": bool(sources["cf_connecting_ip"] or sources["x_forwarded_for_raw"]),
+    }
 
 
 # ------------------------------------------------------- bulk extraction queue
