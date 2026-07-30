@@ -147,6 +147,48 @@ class EventTag(Base):
     event: Mapped[Event] = relationship(back_populates="tags")
 
 
+class ExtractionDraft(Base):
+    """One queued URL, and whatever extraction made of it.
+
+    Server-side rather than held in the browser, for two reasons that both come from
+    the Batch API being asynchronous: a batch can take the best part of an hour, so the
+    tab has to be closable; and John wanted to keep adding URLs to a queue that is
+    already running, which means the queue is shared state, not component state.
+
+    Nothing here writes to `events`. A draft is a proposal — approving it is a separate,
+    deliberate call, and the review form is the last line of defence against a page that
+    tried to talk the model into something.
+    """
+
+    __tablename__ = "extraction_drafts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_new_id)
+
+    url: Mapped[str] = mapped_column(String(2000))
+    # queued -> running -> ready | failed | approved | discarded
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+
+    # Set once submitted, so results can be collected after a restart. Null for drafts
+    # that were extracted synchronously.
+    batch_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+    # The ExtractOut payload, stored as-is so the review form can load it without a
+    # translation layer. Null until extraction returns.
+    draft: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Populated on failure. Shown verbatim — "Instagram needs a login" is more useful
+    # than "extraction failed".
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Set when approved, so the queue can link to what it produced.
+    event_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (Index("ix_extraction_drafts_created", "created_at"),)
+
+
 class StatCounter(Base):
     """Aggregate interaction counts. One row per (day, metric, event).
 

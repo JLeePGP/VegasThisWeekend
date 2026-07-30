@@ -12,20 +12,23 @@ event in front of users on its own.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..auth import require_admin
 from ..config import get_settings
 from ..db import get_db
+from ..bulk_extraction import BulkExtractionError, collect as collect_batches
+from ..bulk_extraction import parse_urls, submit as submit_batch
 from ..duplicates import find_possible_duplicates
 from ..extraction import ExtractionError, extract_event, parse_local
 from ..images import ImageMirrorError, mirror_to_r2
 from ..limiter import limiter
-from ..models import Event, EventTag, InsiderTip
+from ..models import Event, EventTag, ExtractionDraft, InsiderTip
 from ..recurrence import expand_occurrences
 from ..stats import summary
 from ..schemas_admin import (
@@ -55,15 +58,14 @@ DEFAULT_DURATION = timedelta(hours=3)
 # ------------------------------------------------------------------ extraction
 
 
-@router.post("/extract", response_model=ExtractOut)
-@limiter.limit("10/minute")
-def extract(request: Request, payload: ExtractIn) -> ExtractOut:
-    """Read a URL (or pasted text) and return a draft. Writes nothing."""
-    try:
-        result = extract_event(url=payload.url, text=payload.text)
-    except ExtractionError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+def build_extract_out(result, *, source_url: str | None) -> ExtractOut:
+    """Turn a validated ExtractionResult into the payload the review form loads.
 
+    Shared by the single-URL endpoint and the bulk batch collector. One implementation
+    on purpose: the batch path validates the model's JSON by hand rather than through
+    `messages.parse`, and two copies of this mapping would drift the moment a field was
+    added — which is exactly what just happened with address, tags and alcohol_free.
+    """
     recurrence = ExtractRecurrenceOut(
         repeats=result.recurrence.repeats,
         weekdays=[day.value for day in result.recurrence.weekdays],
@@ -90,29 +92,44 @@ def extract(request: Request, payload: ExtractIn) -> ExtractOut:
         # reviewer can correct, and it keeps the event from having a zero-length window.
         end_local = start_local + DEFAULT_DURATION
 
-    draft = ExtractedDraft(
-        name=event.name,
-        venue=event.venue,
-        neighborhood=event.neighborhood.value,
-        starts_at_local=start_local.strftime("%Y-%m-%dT%H:%M"),
-        ends_at_local=end_local.strftime("%Y-%m-%dT%H:%M"),
-        vibe=event.vibe.value,
-        price_tier=event.price_tier.value,
-        price_note=event.price_note,
-        hook=event.hook,
-        description=event.description,
-        ticket_url=event.ticket_url,
-        image_url=event.image_url,
-        source_url=payload.url,
-    )
-
     return ExtractOut(
         found_event=True,
-        draft=draft,
+        draft=ExtractedDraft(
+            name=event.name,
+            venue=event.venue,
+            neighborhood=event.neighborhood.value,
+            address=event.address,
+            starts_at_local=start_local.strftime("%Y-%m-%dT%H:%M"),
+            ends_at_local=end_local.strftime("%Y-%m-%dT%H:%M"),
+            vibe=event.vibe.value,
+            # The model is told not to repeat the primary vibe here, but it is a model,
+            # so the guarantee is enforced rather than trusted.
+            tags=[tag.value for tag in event.tags if tag != event.vibe],
+            alcohol_free=event.alcohol_free,
+            price_tier=event.price_tier.value,
+            price_note=event.price_note,
+            hook=event.hook,
+            description=event.description,
+            ticket_url=event.ticket_url,
+            image_url=event.image_url,
+            source_url=source_url,
+        ),
         recurrence=recurrence,
         uncertain_fields=result.uncertain_fields,
         notes=result.notes,
     )
+
+
+@router.post("/extract", response_model=ExtractOut)
+@limiter.limit("10/minute")
+def extract(request: Request, payload: ExtractIn) -> ExtractOut:
+    """Read a URL (or pasted text) and return a draft. Writes nothing."""
+    try:
+        result = extract_event(url=payload.url, text=payload.text)
+    except ExtractionError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return build_extract_out(result, source_url=payload.url)
 
 
 # ------------------------------------------------------------------ events
@@ -330,6 +347,149 @@ def deactivate_event(
     row.is_active = False
     db.commit()
     return AdminEventOut.from_event(row)
+
+
+# ------------------------------------------------------- bulk extraction queue
+
+
+class BulkSubmitIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # One URL per line. Parsed server-side so the same rules apply however it is called.
+    urls: str = Field(min_length=1, max_length=100_000)
+
+
+class BulkSubmitOut(BaseModel):
+    batch_id: str
+    queued: int
+    # Lines that were not usable URLs, echoed back so a typo is visible immediately
+    # rather than becoming a failed draft ten minutes later.
+    rejected: list[str]
+
+
+class QueueItemOut(BaseModel):
+    id: str
+    url: str
+    status: str
+    draft: dict | None
+    error: str | None
+    event_id: str | None
+    created_at: datetime
+    # True when extraction thinks this is a residency. Never acted on automatically —
+    # a wrong guess in bulk would add dozens of events to delete one at a time.
+    looks_recurring: bool
+
+
+@router.post("/extractions", response_model=BulkSubmitOut, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("6/minute")
+def submit_extractions(
+    request: Request, payload: BulkSubmitIn, db: Session = Depends(get_db)
+) -> BulkSubmitOut:
+    """Queue a block of pasted URLs for extraction."""
+    urls, rejected = parse_urls(payload.urls)
+    if not urls:
+        raise HTTPException(
+            status_code=422,
+            detail="No usable URLs in that. Each line should be an http(s) link.",
+        )
+    try:
+        batch_id, drafts = submit_batch(db, urls)
+    except BulkExtractionError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return BulkSubmitOut(batch_id=batch_id, queued=len(drafts), rejected=rejected)
+
+
+@router.get("/extractions", response_model=list[QueueItemOut])
+@limiter.limit("60/minute")
+def list_extractions(
+    request: Request,
+    refresh: bool = Query(True, description="Check finished batches before listing."),
+    db: Session = Depends(get_db),
+) -> list[QueueItemOut]:
+    """The queue. Collecting finished batches happens here rather than on a schedule —
+    there is no worker process, and the person looking at the queue is the only one who
+    needs it to be current."""
+    if refresh:
+        collect_batches(db)
+
+    rows = db.scalars(
+        select(ExtractionDraft)
+        .where(ExtractionDraft.status != "discarded")
+        .order_by(ExtractionDraft.created_at.desc())
+        .limit(200)
+    ).all()
+
+    return [
+        QueueItemOut(
+            id=row.id,
+            url=row.url,
+            status=row.status,
+            draft=row.draft,
+            error=row.error,
+            event_id=row.event_id,
+            created_at=row.created_at,
+            looks_recurring=bool((row.draft or {}).get("recurrence", {}).get("repeats")),
+        )
+        for row in rows
+    ]
+
+
+@router.post("/extractions/{draft_id}/discard", response_model=QueueItemOut)
+@limiter.limit("60/minute")
+def discard_extraction(
+    request: Request,
+    draft_id: str = Path(pattern=ID_PATTERN),
+    db: Session = Depends(get_db),
+) -> QueueItemOut:
+    row = db.get(ExtractionDraft, draft_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Draft not found.")
+    row.status = "discarded"
+    db.commit()
+    return QueueItemOut(
+        id=row.id,
+        url=row.url,
+        status=row.status,
+        draft=row.draft,
+        error=row.error,
+        event_id=row.event_id,
+        created_at=row.created_at,
+        looks_recurring=False,
+    )
+
+
+@router.post("/extractions/{draft_id}/mark-approved", response_model=QueueItemOut)
+@limiter.limit("60/minute")
+def mark_extraction_approved(
+    request: Request,
+    event_id: str = Query(pattern=ID_PATTERN),
+    draft_id: str = Path(pattern=ID_PATTERN),
+    db: Session = Depends(get_db),
+) -> QueueItemOut:
+    """Link a draft to the event it produced, once the normal create endpoint saved it.
+
+    Kept separate from creating the event on purpose. The review form already posts to
+    /admin/events with every validation and the duplicate check attached, and routing
+    bulk approvals through a second write path would mean two places for those rules to
+    live — and one of them would eventually be wrong.
+    """
+    row = db.get(ExtractionDraft, draft_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Draft not found.")
+    row.status = "approved"
+    row.event_id = event_id
+    db.commit()
+    return QueueItemOut(
+        id=row.id,
+        url=row.url,
+        status=row.status,
+        draft=row.draft,
+        error=row.error,
+        event_id=row.event_id,
+        created_at=row.created_at,
+        looks_recurring=False,
+    )
 
 
 # ------------------------------------------------------------------ stats

@@ -137,10 +137,18 @@ class ExtractedEvent(BaseModel):
     name: str
     venue: str
     neighborhood: Neighborhood
+    # Street address if the page states one. The app derives a maps link from it, and it
+    # is what `neighborhood` should be reasoned from when both are available.
+    address: str | None
     # Naive Vegas wall clock, "YYYY-MM-DDTHH:MM". Never a UTC time, never an offset.
     starts_at_local: str
     ends_at_local: str | None
     vibe: Vibe
+    # Additional categories beyond the primary one. A yoga social is fitness and local.
+    tags: list[Vibe]
+    # Only ever true on an explicit statement. See the prompt — the failure here is not
+    # symmetric, so the model is told to leave it false when unsure.
+    alcohol_free: bool
     price_tier: PriceTier
     price_note: str | None
     hook: str
@@ -196,8 +204,32 @@ CATEGORY — pick exactly one `vibe`:
 - sports: games, matches, fights, races
 - outdoors: hikes, rides, parks, anything primarily outside
 - family: explicitly aimed at children or all ages
+- fitness: classes, runs, yoga, gym and training events
 - adult: 21+ where that is the point (burlesque, adult revue)
 - local: markets, meetups, community events aimed at residents
+
+EXTRA CATEGORIES — `tags`:
+- Any further categories from the same list that genuinely apply. A rooftop yoga \
+social is vibe=fitness with tags ["outdoors", "local"].
+- Leave it empty when only one category fits. Do not pad it.
+- Do not repeat the primary `vibe` in `tags`.
+
+ALCOHOL-FREE — `alcohol_free`:
+- True ONLY when the source explicitly says so: "sober", "dry", "alcohol-free", \
+"no bar", "zero-proof", "mocktails only".
+- A page that simply does not mention alcohol is NOT evidence. Neither is a daytime \
+start, a family audience, a gym, or a coffee shop.
+- Default to false whenever you are unsure, and do not add it to `uncertain_fields` \
+just because alcohol went unmentioned — silence is the normal case, not a gap.
+- The error here is one-directional: a sober event wrongly marked false is a missed \
+filter match, while a drinking event wrongly marked true sends someone who is \
+avoiding alcohol to a bar. Be conservative.
+
+ADDRESS — `address`:
+- The street address if the page states one, as written, including the city and state \
+when given. Null when the page gives no address.
+- When you have an address, use it to choose `neighborhood`. Do not invent an address \
+from a neighbourhood.
 
 PRICE — pick the bucket for the cheapest real admission:
 - free: no ticket needed

@@ -6,6 +6,20 @@ const TOKEN_KEY = 'vtw.admin.token';
 
 export const getStats = (days = 30) => request(`/admin/stats?days=${days}`);
 
+export const submitExtractions = (urls) =>
+  request('/admin/extractions', { method: 'POST', body: { urls } });
+
+export const listExtractions = ({ refresh = true } = {}) =>
+  request(`/admin/extractions?refresh=${refresh}`);
+
+export const discardExtraction = (id) =>
+  request(`/admin/extractions/${id}/discard`, { method: 'POST' });
+
+/** Links an approved draft to the event it produced. Best-effort: the event is already
+ *  saved by this point, so a failure here must not look like the save failed. */
+export const markExtractionApproved = (id, eventId) =>
+  request(`/admin/extractions/${id}/mark-approved?event_id=${eventId}`, { method: 'POST' });
+
 export const readToken = () => {
   try {
     return window.localStorage.getItem(TOKEN_KEY) ?? '';

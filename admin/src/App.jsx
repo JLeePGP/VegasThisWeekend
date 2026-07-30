@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { API_BASE, ApiError, createEvent, getStatus, readToken, updateEvent, writeToken } from './api';
+import {
+  API_BASE,
+  ApiError,
+  createEvent,
+  getStatus,
+  markExtractionApproved,
+  readToken,
+  updateEvent,
+  writeToken,
+} from './api';
 import { EMPTY_EVENT } from './constants';
 import DuplicateDialog from './components/DuplicateDialog';
 import EventForm from './components/EventForm';
 import EventList from './components/EventList';
+import BulkPanel from './components/BulkPanel';
 import ExtractPanel from './components/ExtractPanel';
 import StatsPanel from './components/StatsPanel';
 import TipsPanel from './components/TipsPanel';
@@ -65,6 +75,9 @@ export default function App() {
   const [recurrence, setRecurrence] = useState(BLANK_RECURRENCE);
   const [uncertain, setUncertain] = useState(new Set());
   const [editing, setEditing] = useState(null);
+  // The queue row the form was loaded from, so saving can mark it done. Null for
+  // manual entry and for single-URL extraction.
+  const [queuedDraft, setQueuedDraft] = useState(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -112,18 +125,22 @@ export default function App() {
     setRecurrence(BLANK_RECURRENCE);
     setUncertain(new Set());
     setEditing(null);
+    setQueuedDraft(null);
   }
 
-  function loadDraft(result) {
+  function loadDraft(result, { fromQueue = null } = {}) {
     const draft = result.draft;
     setForm({
       ...EMPTY_EVENT,
       name: draft.name,
       venue: draft.venue,
       neighborhood: draft.neighborhood,
+      address: draft.address ?? '',
       starts_at_local: draft.starts_at_local,
       ends_at_local: draft.ends_at_local,
       vibe: draft.vibe,
+      tags: draft.tags ?? [],
+      alcohol_free: Boolean(draft.alcohol_free),
       price_tier: draft.price_tier,
       price_note: draft.price_note ?? '',
       hook: draft.hook,
@@ -134,17 +151,32 @@ export default function App() {
     });
     setUncertain(new Set(result.uncertain_fields));
     setEditing(null);
+    setQueuedDraft(fromQueue);
     setSaved(null);
     setSaveError(null);
+    // Recurrence is pre-filled but the checkbox is left off for a queued draft: bulk
+    // must never turn one pasted URL into 26 events on the model's say-so.
     setRecurrence(
-      result.recurrence.repeats
+      result.recurrence.repeats && !fromQueue
         ? {
             enabled: true,
             weekdays: result.recurrence.weekdays,
             until: result.recurrence.until_local_date ?? '',
           }
-        : BLANK_RECURRENCE,
+        : result.recurrence.repeats
+          ? {
+              enabled: false,
+              weekdays: result.recurrence.weekdays,
+              until: result.recurrence.until_local_date ?? '',
+            }
+          : BLANK_RECURRENCE,
     );
+  }
+
+  /** Load a queued draft into the form and switch to it. */
+  function reviewQueued(item) {
+    loadDraft(item.draft, { fromQueue: item });
+    setTab('add');
   }
 
   function startEditing(event) {
@@ -199,6 +231,13 @@ export default function App() {
               : `Saved ${count} nights of "${payload.name}".`,
           warning: result.image_warning,
         });
+
+        if (queuedDraft) {
+          // Best-effort, and deliberately not awaited into the error path: the event is
+          // already saved by this point, so a failure to tick the queue row must not
+          // surface as "saving failed" and tempt a second save.
+          markExtractionApproved(queuedDraft.id, result.created[0].id).catch(() => {});
+        }
       }
 
       setCollisions(null);
@@ -286,6 +325,7 @@ export default function App() {
       <nav className="tabs" role="tablist">
         {[
           ['add', editing ? 'Edit event' : 'Add event'],
+          ['bulk', 'Bulk links'],
           ['events', 'Events'],
           ['tips', 'Insider tips'],
           ['stats', 'Stats'],
@@ -360,6 +400,9 @@ export default function App() {
       {tab === 'events' && <EventList onEdit={startEditing} refreshKey={refreshKey} />}
       {tab === 'tips' && <TipsPanel />}
       {tab === 'stats' && <StatsPanel />}
+      {tab === 'bulk' && (
+        <BulkPanel refreshKey={refreshKey} onReview={(item) => reviewQueued(item)} />
+      )}
 
       {collisions && (
         <DuplicateDialog

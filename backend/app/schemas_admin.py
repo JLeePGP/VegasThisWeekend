@@ -201,9 +201,12 @@ class ExtractedDraft(BaseModel):
     name: str
     venue: str
     neighborhood: str
+    address: str | None = None
     starts_at_local: str
     ends_at_local: str
     vibe: str
+    tags: list[str] = Field(default_factory=list)
+    alcohol_free: bool = False
     price_tier: str
     price_note: str | None
     hook: str
