@@ -35,6 +35,36 @@ MAX_TOKENS = 16_000
 # A server-side fetch that runs long returns `pause_turn` and must be re-sent.
 MAX_CONTINUATIONS = 3
 
+# Two cost levers, both plumbed and both currently OFF, because measuring them on real
+# pages did not support turning either on. Recorded here so the next attempt starts from
+# the data rather than repeating it.
+#
+# What seven live extractions on John's own source URLs showed (Sonnet 5, standard rates):
+#
+#   Eventbrite page, effort high, no cap : 74,283 in /  5,131 out  = $0.30
+#   Venue page,      effort high, no cap : 44,801 in /  2,034 out  = $0.16
+#   Eventbrite page, effort high, 10k cap: 31,792 in /  3,321 out  = $0.15
+#   Venue page,      effort high, 10k cap: 32,366 in /  2,034 out  = $0.13
+#   Eventbrite page, effort medium       : 31,796 in /  2,806 out  = $0.14
+#   Venue page,      effort medium       : 103,845 in / 2,393 out  = $0.35
+#
+# The last line is the point. The same venue page, one setting changed, went from 44,801
+# to 103,845 input tokens — a 2.3x swing in the opposite direction to the one predicted.
+# The dominant variable is not effort or the cap, it is how many times the model chooses
+# to call web_fetch (max_uses allows up to 4), and that varies run to run. With one
+# sample per configuration the noise is larger than the effect, so any tuning conclusion
+# drawn from it would be invented.
+#
+# The cap also cost accuracy where it was measurable: both runs that used it, and the
+# medium-effort Eventbrite run, flagged `starts_at_local` as uncertain, which the
+# uncapped high-effort run did not. A setting that makes the model unsure of the start
+# time is a bad trade at any price.
+#
+# If this is revisited: fix max_uses first (it bounds cost far more predictably than
+# either of these), and take at least five samples per configuration.
+WEB_FETCH_MAX_CONTENT_TOKENS: int | None = None
+EFFORT: str | None = None
+
 _SAFE_URL_SCHEMES = {"http", "https"}
 
 logger = logging.getLogger(__name__)
@@ -214,12 +244,15 @@ def extract_event(*, url: str | None = None, text: str | None = None) -> Extract
         # that needs the reasoning.
         "thinking": {"type": "adaptive"},
     }
+    if EFFORT is not None:
+        request["output_config"] = {"effort": EFFORT}
     if url:
         # web_fetch only retrieves URLs already present in the conversation, so the
         # pasted link in the user turn is what bounds what it can reach.
-        request["tools"] = [
-            {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 4}
-        ]
+        fetch_tool: dict = {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 4}
+        if WEB_FETCH_MAX_CONTENT_TOKENS is not None:
+            fetch_tool["max_content_tokens"] = WEB_FETCH_MAX_CONTENT_TOKENS
+        request["tools"] = [fetch_tool]
 
     messages = [{"role": "user", "content": _user_content(url=url, text=text, today=now_vegas().date())}]
 
