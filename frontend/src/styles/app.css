@@ -1217,9 +1217,11 @@ a {
   inset: 0;
 }
 
-/* Empty, error and loading states still need to sit in the readable middle rather than
-   under the floating chrome. */
-.app--immersive .stage > .empty,
+/* Empty, error and loading states sit in the readable middle rather than under the
+   floating chrome. The empty state is `.state`, not `.empty` — an earlier version of
+   this rule guessed the class name and silently did nothing. It happened to look right
+   anyway because `.state` centres itself, which is exactly how dead CSS survives. */
+.app--immersive .stage > .state,
 .app--immersive .stage > .skeleton {
   position: absolute;
   inset: var(--chrome-top) var(--space-4) var(--chrome-bottom);
