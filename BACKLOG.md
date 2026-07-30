@@ -23,6 +23,21 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 | B2 | **Multiple categories per event** — `primary vibe` + additive tag rows | `d7ed64e` |
 | — | `source_url` exposed publicly — the Website link had been dead | `d7ed64e` |
 | B3 | **First-party analytics** — counters, admin dashboard, Plausible retired | `bfb1ade` |
+| B4 | **Bulk URL extraction** — paste a list, server-side queue, review each | `1e56386` |
+| B4a | Separate link fields on extract (they already existed as columns) | `d7ed64e` |
+| C10 | Extraction `effort` measured — see the note in `extraction.py` | `5b83047` |
+
+**Extraction cost, finally measured rather than estimated.** Prompt caching on the
+continuation loop took the worst observed run from **$0.48 to $0.17** and collapsed the
+spread from 3.4× to 1.5× — the problem was never a high average, it was the same page
+costing wildly different amounts because a `pause_turn` resend carried the whole fetched
+page again at full price. Median is now **$0.12/URL**: ~$27/month sync at 50 events a
+week, **~$13.50 batched**.
+
+Three hypotheses were wrong before that one was right — a content cap (hurt accuracy on
+the start time), `effort` (run-to-run noise swamped it), and `max_uses=1` (worse on both
+cost *and* accuracy). All three are recorded in `extraction.py` with their numbers, so
+the next attempt starts from data. Total measurement spend: about $2.23.
 
 **Migration `b2c7d41ae903` applied to production 30 Jul**, all 10 events intact.
 Deliberately additive — nothing dropped, renamed or rewritten — so it was safe to run
