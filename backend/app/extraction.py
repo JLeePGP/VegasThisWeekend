@@ -65,6 +65,29 @@ MAX_CONTINUATIONS = 3
 WEB_FETCH_MAX_CONTENT_TOKENS: int | None = None
 EFFORT: str | None = None
 
+# How many times the model may fetch.
+#
+# Left at 4. Dropping it to 1 was tried, on the theory that fetch count was what made
+# cost swing; five runs said otherwise, and made it worse on both axes:
+#
+#   Eventbrite, max_uses=1, n=3 : 31,790 / 89,319 / 130,962 input tokens
+#                                 $0.14 / $0.33 / $0.48   (median $0.33, was $0.30 at 4)
+#                                 starts_at_local uncertain in 3 of 3 runs, where the
+#                                 max_uses=4 baseline was sure of it
+#
+# A 4x spread on one page with only one fetch permitted rules out fetch count as the
+# cause. The remaining explanation is this module's own continuation loop: a `pause_turn`
+# response is resolved by echoing the whole turn back (see MAX_CONTINUATIONS), and every
+# resend carries the entire fetched page again, so a run that pauses twice pays for that
+# page three times. That fits the observed 31k / 89k / 131k pattern almost exactly.
+#
+# If this is picked up again, the fix to try is prompt caching on the continuation loop —
+# a cache_control breakpoint on the fetched content would make resends read at ~0.1x
+# instead of full price, and the page is far above the 1024-token minimum. That is a
+# change to how the loop is built, not a number to tune, which is why it is not being
+# guessed at here.
+WEB_FETCH_MAX_USES = 4
+
 _SAFE_URL_SCHEMES = {"http", "https"}
 
 logger = logging.getLogger(__name__)
@@ -249,7 +272,11 @@ def extract_event(*, url: str | None = None, text: str | None = None) -> Extract
     if url:
         # web_fetch only retrieves URLs already present in the conversation, so the
         # pasted link in the user turn is what bounds what it can reach.
-        fetch_tool: dict = {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 4}
+        fetch_tool: dict = {
+            "type": "web_fetch_20260209",
+            "name": "web_fetch",
+            "max_uses": WEB_FETCH_MAX_USES,
+        }
         if WEB_FETCH_MAX_CONTENT_TOKENS is not None:
             fetch_tool["max_content_tokens"] = WEB_FETCH_MAX_CONTENT_TOKENS
         request["tools"] = [fetch_tool]
