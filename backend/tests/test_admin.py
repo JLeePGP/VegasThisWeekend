@@ -365,3 +365,95 @@ class TestExtractEndpoint:
         response = admin_client.post("/admin/extract", json={"text": "Some pasted flyer text."})
         assert response.status_code == 422
         assert "ANTHROPIC_API_KEY" in response.json()["detail"]
+
+
+class TestCategoriesAndSober:
+    """The write path for multi-category, alcohol-free and address."""
+
+    def test_extra_categories_round_trip(self, admin_client):
+        created = admin_client.post(
+            "/admin/events",
+            json=event_payload(vibe="fitness", tags=["outdoors", "local"]),
+        ).json()["created"][0]
+        assert created["vibe"] == "fitness"
+        assert created["tags"] == ["fitness", "local", "outdoors"]
+
+    def test_primary_vibe_is_not_stored_twice(self, admin_client, db):
+        """The events row already carries it; a second copy is a second thing to keep
+        in step. Sending it is allowed, storing it again is not."""
+        body = admin_client.post(
+            "/admin/events",
+            json=event_payload(vibe="fitness", tags=["fitness", "outdoors"]),
+        ).json()["created"][0]
+
+        stored = {tag.tag for tag in db.get(Event, body["id"]).tags}
+        assert stored == {"outdoors"}
+        # ...but the API still presents the full set.
+        assert body["tags"] == ["fitness", "outdoors"]
+
+    def test_editing_replaces_categories_wholesale(self, admin_client):
+        created = admin_client.post(
+            "/admin/events", json=event_payload(vibe="fitness", tags=["outdoors"])
+        ).json()["created"][0]
+
+        updated = admin_client.put(
+            f"/admin/events/{created['id']}",
+            json=event_payload(vibe="fitness", tags=["local"]),
+        ).json()
+        # Merging would make removing a category impossible.
+        assert updated["tags"] == ["fitness", "local"]
+
+    def test_editing_can_clear_every_extra_category(self, admin_client):
+        created = admin_client.post(
+            "/admin/events", json=event_payload(vibe="fitness", tags=["outdoors"])
+        ).json()["created"][0]
+        updated = admin_client.put(
+            f"/admin/events/{created['id']}", json=event_payload(vibe="fitness", tags=[])
+        ).json()
+        assert updated["tags"] == ["fitness"]
+
+    def test_alcohol_free_round_trips(self, admin_client):
+        created = admin_client.post(
+            "/admin/events", json=event_payload(alcohol_free=True)
+        ).json()["created"][0]
+        assert created["alcohol_free"] is True
+
+    def test_alcohol_free_defaults_to_false(self, admin_client):
+        """Never inferred. A page that does not mention alcohol is not evidence, and
+        guessing optimistically sends someone in recovery to a bar."""
+        created = admin_client.post("/admin/events", json=event_payload()).json()["created"][0]
+        assert created["alcohol_free"] is False
+
+    def test_address_round_trips_and_neighborhood_is_untouched(self, admin_client):
+        created = admin_client.post(
+            "/admin/events",
+            json=event_payload(address="1 Fremont St, Las Vegas, NV 89101"),
+        ).json()["created"][0]
+        assert created["address"] == "1 Fremont St, Las Vegas, NV 89101"
+        # address is additive; nothing about neighborhood changed.
+        assert created["neighborhood"] == "Arts District"
+
+    def test_address_is_optional(self, admin_client):
+        created = admin_client.post("/admin/events", json=event_payload()).json()["created"][0]
+        assert created["address"] is None
+
+    def test_rejects_a_category_outside_the_vocabulary(self, admin_client):
+        response = admin_client.post(
+            "/admin/events", json=event_payload(tags=["sober"])
+        )
+        # "sober" is deliberately not a Vibe — it is an attribute, not a category.
+        assert response.status_code == 422
+
+    def test_a_recurring_series_gets_the_categories_on_every_night(self, admin_client):
+        created = admin_client.post(
+            "/admin/events",
+            json=event_payload(
+                vibe="fitness",
+                tags=["outdoors"],
+                alcohol_free=True,
+                recurrence={"weekdays": ["friday"], "until_local_date": "2026-08-21"},
+            ),
+        ).json()["created"]
+        assert len(created) > 1
+        assert all(night["tags"] == ["fitness", "outdoors"] for night in created)
+        assert all(night["alcohol_free"] is True for night in created)

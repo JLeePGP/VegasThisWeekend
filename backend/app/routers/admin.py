@@ -25,7 +25,7 @@ from ..duplicates import find_possible_duplicates
 from ..extraction import ExtractionError, extract_event, parse_local
 from ..images import ImageMirrorError, mirror_to_r2
 from ..limiter import limiter
-from ..models import Event, InsiderTip
+from ..models import Event, EventTag, InsiderTip
 from ..recurrence import expand_occurrences
 from ..schemas_admin import (
     AdminEventOut,
@@ -177,6 +177,16 @@ def _resolve_image(payload: EventWriteIn) -> tuple[str | None, bool, str | None]
         return payload.image_url, False, str(error)
 
 
+def _tag_rows(payload: EventWriteIn) -> list[EventTag]:
+    """The event's *additional* categories as tag rows.
+
+    The primary vibe is dropped if the form happens to include it: it lives on the
+    events row, and storing it twice would mean two places to keep in step.
+    """
+    extra = {tag.value for tag in payload.tags} - {payload.vibe.value}
+    return [EventTag(tag=value) for value in sorted(extra)]
+
+
 @router.post("/events", response_model=EventWriteOut, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
 def create_events(
@@ -230,9 +240,12 @@ def create_events(
             name=payload.name,
             venue=payload.venue,
             neighborhood=payload.neighborhood,
+            address=payload.address,
             start_at=start,
             end_at=end,
             vibe=payload.vibe.value,
+            alcohol_free=payload.alcohol_free,
+            tags=_tag_rows(payload),
             price_tier=payload.price_tier.value,
             price_note=payload.price_note,
             hook=payload.hook,
@@ -278,9 +291,14 @@ def replace_event(
     row.name = payload.name
     row.venue = payload.venue
     row.neighborhood = payload.neighborhood
+    row.address = payload.address
     row.start_at = vegas_local_to_utc(payload.starts_at_local)
     row.end_at = vegas_local_to_utc(payload.ends_at_local)
     row.vibe = payload.vibe.value
+    row.alcohol_free = payload.alcohol_free
+    # Replaced wholesale rather than merged: the form always sends the complete set, and
+    # a merge would make removing a category impossible.
+    row.tags = _tag_rows(payload)
     row.price_tier = payload.price_tier.value
     row.price_note = payload.price_note
     row.hook = payload.hook

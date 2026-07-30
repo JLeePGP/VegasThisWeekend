@@ -77,6 +77,10 @@
   --vibe-sports-2: #12a5a0;
   --vibe-outdoors-1: #ff8354;
   --vibe-outdoors-2: #d6456f;
+  /* Lime into teal: reads as energetic without colliding with sports (green) or
+     outdoors (orange), which are its nearest neighbours in the stack. */
+  --vibe-fitness-1: #a8e03c;
+  --vibe-fitness-2: #17b8a6;
   --vibe-family-1: #4ad7c0;
   --vibe-family-2: #6fc93a;
   --vibe-adult-1: #e8306f;

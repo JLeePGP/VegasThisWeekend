@@ -68,6 +68,13 @@ export default function EventForm({
         )}
 
         {field(
+          'address',
+          'Street address',
+          text('address', { placeholder: '1023 Fremont St, Las Vegas, NV 89101' }),
+          { span: true },
+        )}
+
+        {field(
           'starts_at_local',
           'Starts (Vegas time)',
           <input
@@ -113,6 +120,58 @@ export default function EventForm({
           </select>,
         )}
         {field('price_note', 'Price detail', text('price_note', { placeholder: '$25 advance / $35 door' }))}
+      </div>
+
+      <div className="grid" style={{ marginTop: 14 }}>
+        <div className="field span-2">
+          <label>
+            Also counts as
+            <span className="field__note">optional — the primary category is already applied</span>
+          </label>
+          <div className="tagpick">
+            {VIBES.filter((option) => option.value !== value.vibe).map((option) => {
+              const on = (value.tags ?? []).includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="tagpick__chip"
+                  aria-pressed={on}
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      tags: on
+                        ? value.tags.filter((tag) => tag !== option.value)
+                        : [...(value.tags ?? []), option.value],
+                    })
+                  }
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="field span-2">
+          <label className="checkline" htmlFor="f-alcohol_free">
+            <input
+              id="f-alcohol_free"
+              type="checkbox"
+              checked={Boolean(value.alcohol_free)}
+              onChange={set('alcohol_free')}
+            />
+            <span>
+              <strong>Alcohol-free</strong>
+              {/* Worth being blunt in the UI: this is the one field where guessing
+                  optimistically sends someone in recovery to a bar. */}
+              <span className="checkline__hint">
+                Only tick this if the source actually says so — dry, sober, no bar. Not
+                mentioning alcohol is not the same as being alcohol-free.
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
 
       <div className="grid" style={{ marginTop: 14 }}>

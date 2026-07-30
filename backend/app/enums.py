@@ -10,12 +10,21 @@ from enum import Enum
 
 
 class Vibe(str, Enum):
+    """What kind of event this is.
+
+    Note what is *not* here: "sober". Alcohol-free is an attribute that cuts across
+    categories — a sober rave is nightlife AND alcohol-free — and vibe filters combine
+    with OR, so a SOBER member would make "sober nightlife" the one query the filter
+    could not express. It lives on `Event.alcohol_free` instead.
+    """
+
     NIGHTLIFE = "nightlife"
     FOOD_DRINK = "food_drink"
     MUSIC = "music"
     SHOWS = "shows"
     SPORTS = "sports"
     OUTDOORS = "outdoors"
+    FITNESS = "fitness"
     FAMILY = "family"
     ADULT = "adult"
     LOCAL = "local"

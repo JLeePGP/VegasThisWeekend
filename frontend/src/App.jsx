@@ -25,6 +25,7 @@ export default function App() {
       date: next.date,
       vibes: next.vibes.length ? next.vibes.join(',') : 'any',
       prices: next.prices.length ? next.prices.join(',') : 'any',
+      alcoholFree: next.alcoholFree,
     });
   }, []);
 

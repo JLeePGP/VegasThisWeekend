@@ -1,7 +1,8 @@
 import { trackTicketClicked } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { whenLabel } from '../format';
-import { IconChevronUp, IconGlobe, IconTicket } from './Icons';
+import { mapsUrl } from '../maps';
+import { IconChevronUp, IconGlobe, IconPin, IconTicket } from './Icons';
 import Poster from './Poster';
 
 /**
@@ -32,6 +33,9 @@ export default function EventCard({ event, isTop = true, onExpand }) {
 
         <span className="card__when">{whenLabel(event.start_at)}</span>
         <h2 className="card__title">{event.name}</h2>
+        {/* Venue and neighbourhood stay the label even once an address exists: a street
+            number is not what someone recognises at a glance. The address is what the
+            Map link resolves against. */}
         <p className="card__venue">
           {event.venue} · {event.neighborhood}
         </p>
@@ -61,6 +65,16 @@ export default function EventCard({ event, isTop = true, onExpand }) {
               Website
             </a>
           )}
+          <a
+            className="cardlink"
+            href={mapsUrl(event)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Map for ${event.venue}`}
+          >
+            <IconPin width={16} height={16} />
+            Map
+          </a>
           <button
             type="button"
             className="cardlink cardlink--details"

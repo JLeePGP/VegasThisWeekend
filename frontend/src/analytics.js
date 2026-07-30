@@ -64,8 +64,8 @@ export const trackTipRevealed = ({ vibe }) => track('Tip Revealed', { vibe });
 export const trackStackExhausted = ({ reason }) => track('Stack Exhausted', { reason });
 
 /** Filters changed. Shows which vibes and price bands people actually reach for. */
-export const trackFilterChanged = ({ date, vibes, prices }) =>
-  track('Filter Changed', { date, vibes, prices });
+export const trackFilterChanged = ({ date, vibes, prices, alcoholFree }) =>
+  track('Filter Changed', { date, vibes, prices, alcoholFree });
 
 /** A ticket link was followed out. The closest thing to a conversion this app has. */
 export const trackTicketClicked = ({ vibe }) => track('Ticket Clicked', { vibe });

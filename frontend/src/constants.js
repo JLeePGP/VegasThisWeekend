@@ -7,6 +7,8 @@ export const DATE_OPTIONS = [
   { value: 'all', label: 'Anytime' },
 ];
 
+// Note what is not in this list: "Sober". Alcohol-free is an attribute, not a category —
+// see the alcoholFree filter below and the note on the backend Vibe enum.
 export const VIBE_OPTIONS = [
   { value: 'nightlife', label: 'Nightlife' },
   { value: 'food_drink', label: 'Food & Drink' },
@@ -14,6 +16,7 @@ export const VIBE_OPTIONS = [
   { value: 'shows', label: 'Shows' },
   { value: 'sports', label: 'Sports' },
   { value: 'outdoors', label: 'Outdoors' },
+  { value: 'fitness', label: 'Fitness' },
   { value: 'family', label: 'Family' },
   { value: 'adult', label: 'Adult' },
   { value: 'local', label: 'Local' },
@@ -33,7 +36,11 @@ const PRICE_LABELS = Object.fromEntries(PRICE_OPTIONS.map((o) => [o.value, o.lab
 export const vibeLabel = (value) => VIBE_LABELS[value] ?? value;
 export const priceLabel = (value) => PRICE_LABELS[value] ?? value;
 
-export const DEFAULT_FILTERS = { date: 'weekend', vibes: [], prices: [] };
+// `alcoholFree` is a separate boolean rather than a member of `vibes` on purpose.
+// Vibes combine with OR, so a "sober" chip in that list would mean nightlife-or-sober
+// and could never express sober *nightlife* — the one thing someone using it wants.
+// As its own flag it ANDs with whatever chips are selected.
+export const DEFAULT_FILTERS = { date: 'weekend', vibes: [], prices: [], alcoholFree: false };
 
 // Matches the backend's MAX_SHARE_EVENTS.
 export const MAX_SHARE_EVENTS = 20;

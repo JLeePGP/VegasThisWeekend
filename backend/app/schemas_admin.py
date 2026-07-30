@@ -46,9 +46,17 @@ class EventWriteIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     venue: str = Field(min_length=1, max_length=160)
     neighborhood: str = Field(min_length=1, max_length=80)
+    address: str | None = Field(default=None, max_length=240)
     starts_at_local: datetime
     ends_at_local: datetime
+    # The primary category — one value, because it drives the card's colours.
     vibe: Vibe
+    # Any additional categories. The primary vibe is added server-side, so sending it
+    # here is allowed but unnecessary.
+    tags: list[Vibe] = Field(default_factory=list)
+    # Set this only on an explicit signal ("dry", "sober", "alcohol-free", "no bar").
+    # Absence of any mention of alcohol is not evidence.
+    alcohol_free: bool = False
     price_tier: PriceTier
     price_note: str | None = Field(default=None, max_length=120)
     hook: str = Field(min_length=1, max_length=160)
@@ -96,11 +104,14 @@ class AdminEventOut(BaseModel):
     name: str
     venue: str
     neighborhood: str
+    address: str | None
     start_at: datetime
     end_at: datetime
     starts_at_local: str
     ends_at_local: str
     vibe: str
+    tags: list[str]
+    alcohol_free: bool
     price_tier: str
     price_note: str | None
     hook: str
@@ -121,11 +132,14 @@ class AdminEventOut(BaseModel):
             name=event.name,
             venue=event.venue,
             neighborhood=event.neighborhood,
+            address=event.address,
             start_at=event.start_at,
             end_at=event.end_at,
             starts_at_local=to_local_string(event.start_at),
             ends_at_local=to_local_string(event.end_at),
             vibe=event.vibe,
+            tags=event.tag_values,
+            alcohol_free=event.alcohol_free,
             price_tier=event.price_tier,
             price_note=event.price_note,
             hook=event.hook,

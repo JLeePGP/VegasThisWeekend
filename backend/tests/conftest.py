@@ -39,7 +39,7 @@ from sqlalchemy import delete  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.limiter import limiter  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Event, InsiderTip, ShareList  # noqa: E402
+from app.models import Event, EventTag, InsiderTip, ShareList  # noqa: E402
 
 # Rate limits are asserted separately; leaving them on would make unrelated tests flaky.
 limiter.enabled = False
@@ -49,7 +49,10 @@ limiter.enabled = False
 def clean_database():
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
-        for model in (Event, InsiderTip, ShareList):
+        # EventTag before Event: SQLite does not enforce foreign keys unless explicitly
+        # switched on, so the ON DELETE CASCADE cannot be relied on to clear the child
+        # rows here even though it does in Postgres.
+        for model in (EventTag, Event, InsiderTip, ShareList):
             session.execute(delete(model))
         session.commit()
     yield

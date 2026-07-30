@@ -527,3 +527,56 @@ textarea {
   font-family: var(--mono);
   font-size: 12px;
 }
+
+/* Additional categories. Chips rather than a multi-select: a native multi-select
+   needs ctrl-click to deselect, which nobody discovers. */
+.tagpick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tagpick__chip {
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: #a5a3b4;
+  cursor: pointer;
+  background: #16161f;
+  border: 1px solid #262633;
+  border-radius: 999px;
+}
+
+.tagpick__chip[aria-pressed='true'] {
+  color: #f4f3f7;
+  background: rgba(46, 230, 224, 0.14);
+  border-color: #2ee6e0;
+}
+
+.checkline {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.checkline input {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.checkline strong {
+  display: block;
+  font-size: 14px;
+  color: #f4f3f7;
+}
+
+.checkline__hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6c6a7c;
+}

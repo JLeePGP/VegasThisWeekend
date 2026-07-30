@@ -12,7 +12,7 @@ function toggle(list, value) {
 
 export default function FilterBar({ filters, onChange }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const activeCount = filters.vibes.length + filters.prices.length;
+  const activeCount = filters.vibes.length + filters.prices.length + (filters.alcoholFree ? 1 : 0);
 
   return (
     <>
@@ -68,6 +68,29 @@ export default function FilterBar({ filters, onChange }) {
               </div>
             </div>
 
+            {/* Its own control, sitting apart from the vibe chips, because it behaves
+                differently: chips are OR'd with each other, this ANDs with all of them.
+                Grouped in with the chips it would read as "one more category" and
+                selecting Nightlife + Sober would return every bar in town. */}
+            <div className="sheet__group">
+              <span className="sheet__label">Drinking</span>
+              <button
+                type="button"
+                className="switch"
+                role="switch"
+                aria-checked={filters.alcoholFree}
+                onClick={() => onChange({ ...filters, alcoholFree: !filters.alcoholFree })}
+              >
+                <span className="switch__track" aria-hidden="true">
+                  <span className="switch__thumb" />
+                </span>
+                <span className="switch__text">
+                  <strong>Alcohol-free only</strong>
+                  <span>Sober events, in whichever categories you pick</span>
+                </span>
+              </button>
+            </div>
+
             <div className="sheet__group">
               <span className="sheet__label">Price</span>
               <div className="chip-grid">
@@ -94,7 +117,7 @@ export default function FilterBar({ filters, onChange }) {
             type="button"
             className="btn btn--ghost"
             disabled={activeCount === 0}
-            onClick={() => onChange({ ...filters, vibes: [], prices: [] })}
+            onClick={() => onChange({ ...filters, vibes: [], prices: [], alcoholFree: false })}
           >
             Clear
           </button>

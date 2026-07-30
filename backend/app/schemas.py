@@ -23,9 +23,18 @@ class EventOut(BaseModel):
     name: str
     venue: str
     neighborhood: str
+    address: str | None = None
     start_at: datetime
     end_at: datetime
+    # The primary category, which drives the card's colours.
     vibe: Vibe
+    # Every category the event belongs to, primary first. Always contains `vibe`.
+    #
+    # Read from the model's `tag_values` property, not its `tags` relationship: that
+    # attribute holds EventTag rows rather than strings, and letting from_attributes
+    # pick it up by name fails validation the moment an event actually has one.
+    tags: list[Vibe] = Field(default_factory=list, validation_alias="tag_values")
+    alcohol_free: bool = False
     price_tier: PriceTier
     price_note: str | None = None
     hook: str
@@ -33,6 +42,10 @@ class EventOut(BaseModel):
     image_url: str | None = None
     video_url: str | None = None
     ticket_url: str | None = None
+    # The event's own page, as distinct from where to buy a ticket. This was stored and
+    # editable in the admin from the start but never returned here, so the client's
+    # "Website" link had nothing to render and silently never appeared.
+    source_url: str | None = None
     is_sample: bool = False
     # Resolved per-event from the tips table; null when nothing matches.
     insider_tip: str | None = None

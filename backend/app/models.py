@@ -9,9 +9,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.types import JSON, TypeDecorator
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
 
@@ -58,12 +58,26 @@ class Event(Base):
 
     name: Mapped[str] = mapped_column(String(200))
     venue: Mapped[str] = mapped_column(String(160))
+    # Kept alongside `address` rather than replaced by it. It is what every existing
+    # event has, what the cards currently show, and what the filters would need
+    # rewriting to lose — so `address` is additive and this becomes derived later,
+    # once real addresses are populated and verified.
     neighborhood: Mapped[str] = mapped_column(String(80))
+    # Street address. Null on every event that predates this column; the UI falls back
+    # to venue + neighborhood, and a maps link needs no API key — just the text.
+    address: Mapped[str | None] = mapped_column(String(240), nullable=True)
 
     start_at: Mapped[datetime] = mapped_column(UtcDateTime)
     end_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
+    # The primary category: drives the poster colours and the chip on the card. The
+    # full set an event belongs to lives in `tags`, which always contains this value.
     vibe: Mapped[str] = mapped_column(String(32))
+
+    # Alcohol-free. Deliberately a column and not a Vibe — see the note on the enum.
+    # Only ever set from an explicit signal; "the page didn't mention alcohol" is not
+    # evidence, and guessing optimistically sends someone in recovery to a bar.
+    alcohol_free: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     price_tier: Mapped[str] = mapped_column(String(16))
     # Human-readable detail like "$25 advance / $35 door". Display only, never filtered on.
     price_note: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -87,10 +101,50 @@ class Event(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_utcnow, onupdate=_utcnow)
 
+    tags: Mapped[list[EventTag]] = relationship(
+        back_populates="event",
+        cascade="all, delete-orphan",
+        # selectin rather than lazy loading: the list endpoint serialises 20 events at
+        # once, and a lazy relationship would make that 21 queries.
+        lazy="selectin",
+    )
+
+    @property
+    def tag_values(self) -> list[str]:
+        """Every category this event belongs to, primary vibe first.
+
+        `tags` holds only the *additional* categories, so the primary is prepended here
+        rather than stored twice.
+        """
+        rest = sorted(tag.tag for tag in self.tags if tag.tag != self.vibe)
+        return [self.vibe, *rest]
+
     __table_args__ = (
         Index("ix_events_window", "is_active", "start_at", "end_at"),
         Index("ix_events_vibe", "vibe"),
+        Index("ix_events_alcohol_free", "alcohol_free"),
     )
+
+
+class EventTag(Base):
+    """Additional categories for an event, beyond its primary vibe.
+
+    Additional *only* — the primary vibe is not duplicated here. Filtering therefore
+    tests the vibe column OR this table, which is marginally more query but removes an
+    invariant that could silently hide events: an earlier design stored the primary vibe
+    here too and filtered on this table alone, which meant any event created without tag
+    rows disappeared from its own category. Nothing enforced that at the database level,
+    and the seed and test fixtures both got it wrong immediately.
+    """
+
+    __tablename__ = "event_tags"
+
+    event_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("events.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag: Mapped[str] = mapped_column(String(32), primary_key=True, index=True)
+
+    event: Mapped[Event] = relationship(back_populates="tags")
 
 
 class InsiderTip(Base):

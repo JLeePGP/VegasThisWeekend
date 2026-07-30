@@ -11,7 +11,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 
-from app.models import Event, InsiderTip, ShareList
+from app.models import Event, EventTag, InsiderTip, ShareList
 from app.timewindow import VEGAS_TZ
 
 FAR_FUTURE = date.today() + timedelta(days=30)
@@ -277,3 +277,117 @@ class TestGetShare:
 class TestHealth:
     def test_reports_ok(self, client):
         assert client.get("/health").json()["status"] == "ok"
+
+
+class TestCategories:
+    """Multiple categories per event, and the primary/extra split."""
+
+    def test_extra_tag_makes_an_event_appear_under_both_categories(self, client, db):
+        yoga = add_event(db, name="Yoga Networking", vibe="fitness")
+        yoga.tags = [EventTag(tag="outdoors")]
+        db.commit()
+
+        for wanted in ("fitness", "outdoors"):
+            body = client.get("/events", params={"date": "all", "vibe": wanted}).json()
+            assert [item["name"] for item in body["items"]] == ["Yoga Networking"], wanted
+
+    def test_event_with_no_tag_rows_still_matches_its_own_vibe(self, client, db):
+        """Regression guard.
+
+        An earlier design stored the primary vibe in the tag table and filtered on that
+        table alone, so an event saved without tag rows vanished from its own category.
+        Nothing at the database level enforced it. Filtering now tests the column too,
+        which makes the tag table incapable of hiding anything.
+        """
+        add_event(db, name="Untagged Gig", vibe="music")
+        body = client.get("/events", params={"date": "all", "vibe": "music"}).json()
+        assert [item["name"] for item in body["items"]] == ["Untagged Gig"]
+
+    def test_tags_lists_the_primary_vibe_first(self, client, db):
+        event = add_event(db, vibe="fitness")
+        event.tags = [EventTag(tag="outdoors"), EventTag(tag="local")]
+        db.commit()
+
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        assert item["tags"][0] == "fitness"
+        assert set(item["tags"]) == {"fitness", "outdoors", "local"}
+
+    def test_untagged_event_still_reports_its_own_vibe_in_tags(self, client, db):
+        add_event(db, vibe="shows")
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        assert item["tags"] == ["shows"]
+
+    def test_fitness_is_an_accepted_filter_value(self, client, db):
+        add_event(db, name="Sunrise Class", vibe="fitness")
+        body = client.get("/events", params={"date": "all", "vibe": "fitness"}).json()
+        assert [item["name"] for item in body["items"]] == ["Sunrise Class"]
+
+    def test_a_tag_does_not_change_the_primary_vibe(self, client, db):
+        event = add_event(db, vibe="fitness")
+        event.tags = [EventTag(tag="outdoors")]
+        db.commit()
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        # The card's colours key off this, so it must stay the one the admin chose.
+        assert item["vibe"] == "fitness"
+
+
+class TestAlcoholFree:
+    """Sober is an attribute, not a category — the difference is the AND below."""
+
+    def test_filter_excludes_events_that_are_not_alcohol_free(self, client, db):
+        add_event(db, name="Dry Night", alcohol_free=True)
+        add_event(db, name="Wet Night", alcohol_free=False)
+        body = client.get("/events", params={"date": "all", "alcohol_free": "true"}).json()
+        assert [item["name"] for item in body["items"]] == ["Dry Night"]
+
+    def test_omitting_the_filter_returns_everything(self, client, db):
+        add_event(db, name="Dry Night", alcohol_free=True)
+        add_event(db, name="Wet Night", alcohol_free=False)
+        assert client.get("/events", params={"date": "all"}).json()["total"] == 2
+
+    def test_composes_with_vibe_using_and_not_or(self, client, db):
+        """The reason alcohol-free is not simply another vibe.
+
+        Vibe values combine with OR. If "sober" were one of them, asking for nightlife
+        plus sober would return every nightlife event *including the bars*, plus every
+        sober event of any kind — and sober nightlife, the one thing the person wants,
+        would be the single result the filter could not express.
+        """
+        add_event(db, name="Sober Rave", vibe="nightlife", alcohol_free=True)
+        add_event(db, name="Bar Night", vibe="nightlife", alcohol_free=False)
+        add_event(db, name="Dry Yoga", vibe="fitness", alcohol_free=True)
+
+        body = client.get(
+            "/events", params={"date": "all", "vibe": "nightlife", "alcohol_free": "true"}
+        ).json()
+        assert [item["name"] for item in body["items"]] == ["Sober Rave"]
+
+    def test_defaults_to_false_on_events_that_never_set_it(self, client, db):
+        add_event(db, name="Legacy Event")
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        assert item["alcohol_free"] is False
+
+
+class TestPublicFieldExposure:
+    def test_source_url_is_returned(self, client, db):
+        """It was stored and admin-editable from the start but never serialised, so the
+        client's "Website" link had nothing to render and silently never appeared."""
+        add_event(db, source_url="https://example.com/event")
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        assert item["source_url"] == "https://example.com/event"
+
+    def test_address_is_returned(self, client, db):
+        add_event(db, address="123 Fremont St, Las Vegas, NV")
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        assert item["address"] == "123 Fremont St, Las Vegas, NV"
+
+    def test_address_is_null_on_events_that_predate_the_column(self, client, db):
+        add_event(db)
+        item = client.get("/events", params={"date": "all"}).json()["items"][0]
+        assert item["address"] is None
+
+    def test_single_event_endpoint_exposes_them_too(self, client, db):
+        event = add_event(db, source_url="https://example.com/e", address="1 Main St")
+        item = client.get(f"/events/{event.id}").json()
+        assert item["source_url"] == "https://example.com/e"
+        assert item["address"] == "1 Main St"

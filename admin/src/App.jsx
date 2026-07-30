@@ -20,10 +20,15 @@ function toPayload(form, recurrence, { allowRecurrence }) {
     name: form.name.trim(),
     venue: form.venue.trim(),
     neighborhood: form.neighborhood,
+    address: trimmedOrNull(form.address),
     // `datetime-local` emits exactly the naive Vegas wall clock the API expects.
     starts_at_local: form.starts_at_local,
     ends_at_local: form.ends_at_local,
     vibe: form.vibe,
+    // The primary vibe is dropped server-side if it appears here, so the form does not
+    // have to police the overlap.
+    tags: form.tags ?? [],
+    alcohol_free: Boolean(form.alcohol_free),
     price_tier: form.price_tier,
     price_note: trimmedOrNull(form.price_note),
     hook: form.hook.trim(),
@@ -146,9 +151,14 @@ export default function App() {
       name: event.name,
       venue: event.venue,
       neighborhood: event.neighborhood,
+      address: event.address ?? '',
       starts_at_local: event.starts_at_local,
       ends_at_local: event.ends_at_local,
       vibe: event.vibe,
+      // The API returns the full set including the primary; the form holds only the
+      // extras, so strip it back out or it shows as a selected chip for its own vibe.
+      tags: (event.tags ?? []).filter((tag) => tag !== event.vibe),
+      alcohol_free: Boolean(event.alcohol_free),
       price_tier: event.price_tier,
       price_note: event.price_note ?? '',
       hook: event.hook,

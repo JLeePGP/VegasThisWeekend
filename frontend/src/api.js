@@ -44,11 +44,22 @@ async function errorMessageFor(response) {
   return 'Something went wrong. Try again.';
 }
 
-export function fetchEvents({ date, vibes = [], prices = [], limit = 20, offset = 0, signal } = {}) {
+export function fetchEvents({
+  date,
+  vibes = [],
+  prices = [],
+  alcoholFree = false,
+  limit = 20,
+  offset = 0,
+  signal,
+} = {}) {
   const params = new URLSearchParams();
   if (date) params.set('date', date);
   for (const vibe of vibes) params.append('vibe', vibe);
   for (const price of prices) params.append('price', price);
+  // Only sent when on. The server defaults it to false, and an explicit
+  // alcohol_free=false in every URL would make the cache key noisier for nothing.
+  if (alcoholFree) params.set('alcohol_free', 'true');
   params.set('limit', String(limit));
   params.set('offset', String(offset));
   return request(`/events?${params}`, { signal });

@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react';
 import { trackSave, trackTicketClicked, trackTipRevealed } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { fullDateLabel, rangeLabel } from '../format';
-import { IconChevronDown, IconClose, IconGlobe, IconSave, IconTicket, IconTip } from './Icons';
+import { mapsUrl } from '../maps';
+import {
+  IconChevronDown,
+  IconClose,
+  IconGlobe,
+  IconPin,
+  IconSave,
+  IconTicket,
+  IconTip,
+} from './Icons';
 import Poster from './Poster';
 import Sheet from './Sheet';
 
@@ -40,6 +49,16 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
               <dt>Where</dt>
               <dd>
                 {event.venue}, {event.neighborhood}
+                {event.address && <span className="detail__address">{event.address}</span>}
+                <a
+                  className="detail__maplink"
+                  href={mapsUrl(event)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <IconPin width={14} height={14} />
+                  Open in Maps
+                </a>
               </dd>
             </div>
             <div className="detail__fact">

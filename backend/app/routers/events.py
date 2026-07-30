@@ -8,14 +8,14 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db import get_db
 from ..enums import DateFilter, PriceTier, Vibe
 from ..limiter import limiter
-from ..models import Event
+from ..models import Event, EventTag
 from ..schemas import EventListOut, EventOut
 from ..timewindow import now_utc, resolve_window
 from ..tips import load_tip_buckets, match_tip
@@ -38,6 +38,14 @@ def list_events(
     on: date | None = Query(None, description="A specific Vegas date (YYYY-MM-DD)."),
     vibe: list[Vibe] | None = Query(None, description="Repeatable; any match."),
     price: list[PriceTier] | None = Query(None, description="Repeatable; any match."),
+    alcohol_free: bool = Query(
+        False,
+        description=(
+            "Restrict to alcohol-free events. Composes with `vibe` using AND, not OR: "
+            "vibe=nightlife&alcohol_free=true means sober nightlife, which is the whole "
+            "reason this is not simply another vibe."
+        ),
+    ),
     limit: int = Query(20, ge=1, le=20),
     offset: int = Query(0, ge=0, le=5_000),
     db: Session = Depends(get_db),
@@ -55,9 +63,21 @@ def list_events(
     if end_utc is not None:
         conditions.append(Event.start_at < end_utc)
     if vibe:
-        conditions.append(Event.vibe.in_([v.value for v in vibe]))
+        wanted = [v.value for v in vibe]
+        # Primary column OR the extra-categories table, so an event tagged both fitness
+        # and outdoors turns up under either. Testing the column too means an event with
+        # no tag rows at all still appears under its own category — the tag table is
+        # purely additive and cannot hide anything.
+        conditions.append(
+            or_(
+                Event.vibe.in_(wanted),
+                Event.id.in_(select(EventTag.event_id).where(EventTag.tag.in_(wanted))),
+            )
+        )
     if price:
         conditions.append(Event.price_tier.in_([p.value for p in price]))
+    if alcohol_free:
+        conditions.append(Event.alcohol_free.is_(True))
 
     total = db.scalar(select(func.count()).select_from(Event).where(*conditions)) or 0
 
