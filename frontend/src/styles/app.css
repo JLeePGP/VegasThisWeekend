@@ -302,35 +302,30 @@ a {
 /* ------------------------------------------------------------------ card */
 
 .card {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   height: 100%;
   overflow: hidden;
-  background: var(--ink-800);
-  border: 1px solid var(--ink-700);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  background: var(--ink-850);
   touch-action: pan-y;
   user-select: none;
 }
 
-.card__poster {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+/* Legibility wash under the text. The media behind it is arbitrary — a bright venue
+   photo would otherwise leave white type on white. */
+.card__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgba(6, 6, 10, 0.94) 0%, rgba(6, 6, 10, 0.78) 26%, rgba(6, 6, 10, 0.1) 58%, transparent 74%),
+    linear-gradient(to bottom, rgba(6, 6, 10, 0.7) 0%, transparent 26%);
 }
 
 .card__chips {
-  position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  right: var(--space-3);
   display: flex;
   gap: var(--space-2);
-  z-index: 2;
+  margin-bottom: var(--space-3);
 }
 
 .card__chip {
@@ -351,10 +346,12 @@ a {
 }
 
 .card__meta {
-  position: relative;
-  z-index: 2;
-  padding: var(--space-5) var(--space-4) var(--space-4);
-  background: linear-gradient(to top, rgba(6, 6, 10, 0.94) 12%, rgba(6, 6, 10, 0.72) 55%, transparent);
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-5) var(--space-4) var(--chrome-bottom, var(--space-4));
 }
 
 .card__when {
@@ -387,19 +384,10 @@ a {
   color: var(--text-mid);
 }
 
-.card__body {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--ink-700);
-  background: var(--ink-850);
-}
-
 .card__hook {
-  flex: 1;
+  margin-top: var(--space-3);
   font-size: var(--step-0);
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--text-mid);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -408,43 +396,86 @@ a {
   overflow: hidden;
 }
 
-.card__expand {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  color: var(--text-mid);
-  background: var(--ink-750);
-  border: 1px solid var(--ink-700);
-  border-radius: 50%;
+/* ------------------------------------------------------------------ card links */
+
+.card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
-/* Verdict stamps, revealed by drag distance. */
-.card__verdict {
+.cardlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 15px;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--text-hi);
+  text-decoration: none;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.11);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  transition: background 0.16s, border-color 0.16s;
+}
+
+.cardlink:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.cardlink--primary {
+  color: var(--ink-950);
+  background: var(--text-hi);
+  border-color: transparent;
+}
+
+.cardlink--primary:hover {
+  background: #fff;
+  border-color: transparent;
+}
+
+.cardlink--details {
+  margin-left: auto;
+}
+
+/* Verdict stamps. Pinned to the stack rather than the card, so they hold still while
+   the card slides underneath — see the note in SwipeStack. Deliberately loud: at the
+   old size and opacity they were easy to miss mid-gesture. */
+.stack__verdict {
   position: absolute;
-  top: 56px;
-  z-index: 3;
-  padding: 6px 14px;
+  top: 30%;
+  z-index: 6;
+  padding: 10px 22px;
   font-family: var(--font-display);
-  font-size: var(--step-2);
+  font-size: clamp(1.75rem, 9vw, 2.6rem);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  border: 3px solid currentColor;
-  border-radius: var(--radius-sm);
+  border: 4px solid currentColor;
+  border-radius: var(--radius-md);
   pointer-events: none;
+  backdrop-filter: blur(3px);
 }
 
-.card__verdict--save {
-  right: var(--space-4);
+.stack__verdict--save {
+  right: var(--space-5);
   color: var(--pink);
+  background: rgba(255, 46, 136, 0.22);
+  text-shadow: 0 2px 18px rgba(255, 46, 136, 0.55);
+  box-shadow: 0 0 30px rgba(255, 46, 136, 0.45);
   transform: rotate(11deg);
 }
 
-.card__verdict--skip {
-  left: var(--space-4);
-  color: var(--text-low);
+.stack__verdict--skip {
+  left: var(--space-5);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
   transform: rotate(-11deg);
 }
 
@@ -457,12 +488,19 @@ a {
   background: linear-gradient(var(--poster-angle, 145deg), var(--poster-1), var(--poster-2));
 }
 
-.poster__img {
+.poster__img,
+.poster__video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* A video is decoration behind the card, never a player: no controls, no focus stop,
+   and it must not intercept the swipe gesture. */
+.poster__video {
+  pointer-events: none;
 }
 
 /* Two soft light sources so the flat gradient gains some depth. Kept restrained: a
@@ -475,20 +513,35 @@ a {
     radial-gradient(55% 48% at 78% 92%, rgba(0, 0, 0, 0.55), transparent 74%);
 }
 
-/* Sits high on the poster: lower down it disappears behind the card's text scrim. */
-.poster__word {
+/* Wide diagonal bands. At full-screen height a plain two-stop gradient reads as empty;
+   this gives the middle of the card some structure without competing with the title. */
+.poster__bands {
   position: absolute;
-  left: -0.06em;
-  top: 8%;
+  inset: -30%;
+  opacity: 0.5;
+  transform: rotate(var(--poster-band, -12deg));
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0 2px,
+    transparent 2px 13px
+  );
+}
+
+/* Oversized, barely-there echo of the category word bleeding off the right edge. Fills
+   the dead space between the top chips and the title block. */
+.poster__ghost {
+  position: absolute;
+  right: -0.14em;
+  top: 26%;
   font-family: var(--font-display);
-  font-size: clamp(4rem, 22vw, 7rem);
+  font-size: clamp(7rem, 40vw, 15rem);
   font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 0.82;
+  letter-spacing: -0.06em;
+  line-height: 0.78;
   text-transform: uppercase;
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.26);
+  color: rgba(255, 255, 255, 0.055);
   white-space: nowrap;
+  pointer-events: none;
 }
 
 /* Fine grain stops large gradients from banding on cheap phone screens. */
@@ -1137,4 +1190,133 @@ a {
 
 .crash__button:active {
   transform: translateY(0);
+}
+
+/* ------------------------------------------------- immersive discover shell */
+/* Media fills the whole shell and every control floats over it. Applied by route:
+   Discover only. Saved and shared lists stay ordinary scrolling documents. */
+
+.app--immersive {
+  /* How far the card's own content must stay clear of the floating chrome. These are
+     measured against the real controls below — if you resize the action buttons or the
+     tab bar, retune these two numbers or the title will slide under them. */
+  --chrome-top: calc(var(--safe-top) + 116px);
+  --chrome-bottom: calc(var(--safe-bottom) + 186px);
+}
+
+/* The media layer. Behind everything, but above .app::before. */
+.app--immersive .stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* The stack fills the stage rather than a flex slot. */
+.app--immersive .stage > .stack {
+  position: absolute;
+  inset: 0;
+}
+
+/* Empty, error and loading states still need to sit in the readable middle rather than
+   under the floating chrome. */
+.app--immersive .stage > .empty,
+.app--immersive .stage > .skeleton {
+  position: absolute;
+  inset: var(--chrome-top) var(--space-4) var(--chrome-bottom);
+}
+
+/* Full bleed: no rounded corners or inset, so the media reaches the edges. */
+.app--immersive .card {
+  border-radius: 0;
+}
+
+/* The deck no longer scales down behind the top card — at full bleed a scaled card
+   shows a strip of background down both edges and reads as a rendering fault rather
+   than as depth. The next card simply waits directly behind. */
+.app--immersive .stack__slot[data-depth='1'],
+.app--immersive .stack__slot[data-depth='2'] {
+  transform: none;
+}
+
+/* --- floating chrome --- */
+
+.app--immersive .topbar,
+.app--immersive .filterbar {
+  background: transparent;
+}
+
+/* One scrim behind the whole top chrome. Put on the topbar rather than each control so
+   the two do not show a seam between them. */
+.app--immersive .topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  bottom: -80px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(6, 6, 10, 0.82) 0%, rgba(6, 6, 10, 0.45) 45%, transparent);
+}
+
+.app--immersive .topbar {
+  position: relative;
+  z-index: 4;
+}
+
+.app--immersive .filterbar {
+  position: relative;
+  z-index: 4;
+}
+
+/* Transparent spacer between the filters and the controls. It must not swallow pointer
+   events or the lower half of the card stops being swipeable. */
+.app--immersive .discover {
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.app--immersive .actions,
+.app--immersive .hint {
+  pointer-events: auto;
+}
+
+.app--immersive .tabbar {
+  position: relative;
+  z-index: 5;
+  border-top: 0;
+  background: linear-gradient(to top, rgba(6, 6, 10, 0.95) 40%, rgba(6, 6, 10, 0.55) 75%, transparent);
+}
+
+/* Solid pills over arbitrary photography — the outline-only treatment vanished against
+   a bright image. */
+.app--immersive .action {
+  background: rgba(18, 18, 26, 0.82);
+  backdrop-filter: blur(10px);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.app--immersive .action--save {
+  background: rgba(255, 46, 136, 0.24);
+  border-color: rgba(255, 46, 136, 0.55);
+}
+
+.app--immersive .banner {
+  position: relative;
+  z-index: 4;
+  backdrop-filter: blur(10px);
+}
+
+.detail__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: var(--space-4);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.detail__link:hover {
+  text-decoration: underline;
 }

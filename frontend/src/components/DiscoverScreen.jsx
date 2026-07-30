@@ -163,11 +163,17 @@ export default function DiscoverScreen({ filters, onFiltersChange }) {
         </p>
       )}
 
+      {/* The media layer. Absolutely positioned across the whole shell so a card reaches
+          the edges of the screen; every control below floats over it. Kept as a sibling
+          of the chrome rather than a parent so the chrome's stacking order stays obvious. */}
+      <div className="stage">{renderStack()}</div>
+
       <FilterBar filters={filters} onChange={onFiltersChange} />
 
+      {/* Transparent spacer that pins the controls to the bottom. It must not swallow
+          pointer events, or the lower half of the card would stop being swipeable — the
+          controls themselves opt back in. */}
       <div className="discover">
-        {renderStack()}
-
         <div className="actions">
           <button
             type="button"

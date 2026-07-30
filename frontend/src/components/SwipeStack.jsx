@@ -15,6 +15,12 @@ const VISIBLE_CARDS = 3;
 // Movement under this is a tap, not a drag, so the card stays put and onClick fires.
 const TAP_SLOP = 8;
 
+// Stamps reach full strength at roughly half the commit distance rather than at the
+// commit point itself, so the verdict is readable while you are still deciding — which
+// is the only moment it is useful.
+const STAMP_RAMP = 2.1;
+const stampOpacity = (value) => Math.min(1, Math.max(0, value * STAMP_RAMP));
+
 export default function SwipeStack({
   events,
   onSave,
@@ -145,10 +151,21 @@ export default function SwipeStack({
             style={isTop ? topCardStyle() : undefined}
             {...(isTop ? handlers : {})}
           >
-            <EventCard event={event} intent={isTop ? intent : 0} onExpand={() => onExpand(event)} />
+            <EventCard event={event} isTop={isTop} onExpand={() => onExpand(event)} />
           </div>
         );
       })}
+
+      {/* Verdict stamps belong to the stack, not to the card. Inside the card they
+          travelled with it and slid off the edge of the screen at exactly the moment
+          you needed to read them — which is the reason they were hard to see. Pinned
+          here they stay put while the card moves under them. */}
+      <span className="stack__verdict stack__verdict--save" style={{ opacity: stampOpacity(intent) }}>
+        Save
+      </span>
+      <span className="stack__verdict stack__verdict--skip" style={{ opacity: stampOpacity(-intent) }}>
+        Skip
+      </span>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { trackSave, trackTicketClicked, trackTipRevealed } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { fullDateLabel, rangeLabel } from '../format';
-import { IconChevronDown, IconClose, IconSave, IconTicket, IconTip } from './Icons';
+import { IconChevronDown, IconClose, IconGlobe, IconSave, IconTicket, IconTip } from './Icons';
 import Poster from './Poster';
 import Sheet from './Sheet';
 
@@ -53,6 +53,20 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
           </dl>
 
           <p className="detail__description">{event.description}</p>
+
+          {/* The card offers this too; without it here, opening the details is a dead end
+              for anyone who wants the venue's own page rather than a ticket. */}
+          {event.source_url && (
+            <a
+              className="detail__link"
+              href={event.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <IconGlobe width={16} height={16} />
+              Event website
+            </a>
+          )}
 
           {event.insider_tip && (
             <div className="tip">

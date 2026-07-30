@@ -1,53 +1,76 @@
+import { trackTicketClicked } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { whenLabel } from '../format';
-import { IconChevronUp } from './Icons';
+import { IconChevronUp, IconGlobe, IconTicket } from './Icons';
 import Poster from './Poster';
 
-const clamp01 = (value) => Math.min(1, Math.max(0, value));
-
 /**
- * The swipe card face.
+ * The swipe card face. Media fills the card edge to edge and every control floats over
+ * it, so the layout is one stacking context rather than a poster above a text panel.
  *
- * `intent` runs -1 (fully dragged toward skip) to 1 (fully dragged toward save) and only
- * drives the verdict stamps — the transform itself belongs to the stack.
+ * The verdict stamps deliberately live in the stack, not here — see SwipeStack.
  */
-export default function EventCard({ event, intent = 0, onExpand }) {
+export default function EventCard({ event, isTop = true, onExpand }) {
+  // Not every event sells tickets — a free dog-park happy hour showing a Tickets button
+  // is a small lie. Each link renders only when the event actually has one.
+  const hasTickets = Boolean(event.ticket_url);
+  const hasWebsite = Boolean(event.source_url);
+
   return (
     <article className="card">
-      <div className="card__poster">
-        <Poster event={event} />
+      <Poster event={event} active={isTop} />
+      <div className="card__scrim" />
 
+      <div className="card__meta">
+        {/* Category and price sit with the title rather than floating at the top of the
+            card: up there they collided with the filter bar, and the collision moved
+            depending on whether the sample-data banner was showing. */}
         <div className="card__chips">
           <span className="card__chip">{vibeLabel(event.vibe)}</span>
           <span className="card__chip card__chip--price">{priceLabel(event.price_tier)}</span>
         </div>
 
-        <span className="card__verdict card__verdict--save" style={{ opacity: clamp01(intent) }}>
-          Save
-        </span>
-        <span className="card__verdict card__verdict--skip" style={{ opacity: clamp01(-intent) }}>
-          Skip
-        </span>
-
-        <div className="card__meta">
-          <span className="card__when">{whenLabel(event.start_at)}</span>
-          <h2 className="card__title">{event.name}</h2>
-          <p className="card__venue">
-            {event.venue} · {event.neighborhood}
-          </p>
-        </div>
-      </div>
-
-      <div className="card__body">
+        <span className="card__when">{whenLabel(event.start_at)}</span>
+        <h2 className="card__title">{event.name}</h2>
+        <p className="card__venue">
+          {event.venue} · {event.neighborhood}
+        </p>
         <p className="card__hook">{event.hook}</p>
-        <button
-          type="button"
-          className="card__expand"
-          onClick={onExpand}
-          aria-label={`Details for ${event.name}`}
-        >
-          <IconChevronUp width={18} height={18} />
-        </button>
+
+        <div className="card__links">
+          {hasTickets && (
+            <a
+              className="cardlink cardlink--primary"
+              href={event.ticket_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackTicketClicked({ vibe: event.vibe })}
+            >
+              <IconTicket width={16} height={16} />
+              Tickets
+            </a>
+          )}
+          {hasWebsite && (
+            <a
+              className="cardlink"
+              href={event.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <IconGlobe width={16} height={16} />
+              Website
+            </a>
+          )}
+          <button
+            type="button"
+            className="cardlink cardlink--details"
+            onClick={onExpand}
+            aria-label={`Details for ${event.name}`}
+          >
+            <IconChevronUp width={16} height={16} />
+            Details
+          </button>
+        </div>
       </div>
     </article>
   );
