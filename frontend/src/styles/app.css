@@ -1071,3 +1071,70 @@ a {
     transform: translate(-50%, 0);
   }
 }
+
+/* ------------------------------------------------------- crash fallback */
+/* Rendered by ErrorBoundary. Uses only tokens and no components, so a crash
+   inside a shared component cannot also break the screen reporting it. */
+
+.crash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--space-6) var(--space-5);
+  background:
+    radial-gradient(60% 50% at 12% 0%, rgba(255, 46, 136, 0.18), transparent 70%),
+    radial-gradient(50% 44% at 100% 8%, rgba(46, 230, 224, 0.12), transparent 72%),
+    var(--ink-900);
+}
+
+.crash__inner {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.crash__kicker {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.crash__title {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: var(--text-hi);
+}
+
+.crash__body {
+  margin: 0 0 var(--space-5);
+  font-size: var(--step-0);
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+
+.crash__button {
+  padding: var(--space-3) var(--space-6);
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-950);
+  cursor: pointer;
+  background: var(--text-hi);
+  border: 0;
+  border-radius: var(--radius-pill);
+  transition: transform 0.15s var(--ease-out);
+}
+
+.crash__button:hover {
+  transform: translateY(-1px);
+}
+
+.crash__button:active {
+  transform: translateY(0);
+}

@@ -12,12 +12,43 @@
       name="description"
       content="Swipe through what's happening in Las Vegas this weekend. Save what looks good, share it with your group. No account needed."
     />
+    <link rel="canonical" href="https://vegasthisweekend.com/" />
+
+    <!--
+      Share previews. This app spreads by people pasting links into group chats, so
+      these tags are the growth loop, not decoration.
+
+      og:image MUST be an absolute URL — Facebook, iMessage, WhatsApp and X all fetch it
+      from their own servers, where a relative path resolves against nothing.
+
+      The ?v= is a cache-buster. Those scrapers cache a preview per URL for days, so if
+      you regenerate the card (npm run og), bump this number or the old image keeps
+      being served.
+    -->
+    <meta property="og:site_name" content="Vegas This Weekend" />
     <meta property="og:title" content="Vegas This Weekend" />
     <meta
       property="og:description"
-      content="Swipe through what's happening in Las Vegas this weekend."
+      content="Swipe through what's on in Las Vegas this weekend. Save what looks good, send it to your group."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://vegasthisweekend.com/" />
+    <meta property="og:image" content="https://vegasthisweekend.com/og-image.jpg?v=1" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Vegas This Weekend — swipe through what's on, save what looks good, send it to your group."
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Vegas This Weekend" />
+    <meta
+      name="twitter:description"
+      content="Swipe through what's on in Las Vegas this weekend. Save what looks good, send it to your group."
+    />
+    <meta name="twitter:image" content="https://vegasthisweekend.com/og-image.jpg?v=1" />
 
     <!-- Cookieless and GDPR-compliant by default; ignores localhost, so dev is silent. -->
     <script
