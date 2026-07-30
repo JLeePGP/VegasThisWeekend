@@ -22,6 +22,7 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 | B1 | **Street address** + free Google Maps deep link (no API key) | `d7ed64e` |
 | B2 | **Multiple categories per event** — `primary vibe` + additive tag rows | `d7ed64e` |
 | — | `source_url` exposed publicly — the Website link had been dead | `d7ed64e` |
+| B3 | **First-party analytics** — counters, admin dashboard, Plausible retired | `bfb1ade` |
 
 **Migration `b2c7d41ae903` applied to production 30 Jul**, all 10 events intact.
 Deliberately additive — nothing dropped, renamed or rewritten — so it was safe to run
@@ -129,7 +130,7 @@ All three resolved with John. Recorded so they don't get re-opened by accident.
 
 | Decision | Outcome |
 |---|---|
-| Analytics | **First-party counters; retire Plausible.** Keep Cloudflare's free traffic dashboard alongside. |
+| Analytics | **First-party counters; retire Plausible.** Keep Cloudflare's free traffic dashboard alongside. ✅ shipped `bfb1ade` — the site now loads no third-party analytics script at all, and the Stats tab answers which events land. |
 | Bulk extraction | **Build it** — bulk paste → draft queue → human approval. Never auto-publish. |
 | Starting order | **Housekeeping first (C1–C3), then the card rebuild (A1).** |
 
