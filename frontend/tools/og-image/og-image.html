@@ -1,0 +1,138 @@
+<!doctype html>
+<!--
+  Source for the Open Graph share card. Rendered to ../../public/og-image.png by
+  render-og.mjs — it is not served to visitors.
+
+  NOT YET RENDERED OR COMMITTED AS A PNG. See BACKLOG.md.
+
+  Font paths are relative to this file, so `node render-og.mjs` works from this
+  directory on any machine after `npm install` in frontend/.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: 'Space Grotesk Local';
+        src: url('../../node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2')
+          format('woff2-variations');
+        font-weight: 300 700;
+      }
+      @font-face {
+        font-family: 'Inter Local';
+        src: url('../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
+          format('woff2-variations');
+        font-weight: 100 900;
+      }
+
+      * { margin: 0; box-sizing: border-box; }
+
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #0b0b11;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 86px;
+        font-family: 'Inter Local', system-ui, sans-serif;
+        color: #f4f3f7;
+      }
+
+      /* Same neon wash as the app shell, so a shared link looks like the product. */
+      .glow {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(58% 70% at 8% 0%, rgba(255, 46, 136, 0.36), transparent 68%),
+          radial-gradient(52% 62% at 100% 12%, rgba(46, 230, 224, 0.22), transparent 70%),
+          radial-gradient(40% 50% at 76% 100%, rgba(123, 59, 232, 0.28), transparent 72%);
+      }
+
+      .grain {
+        position: absolute;
+        inset: 0;
+        opacity: 0.16;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
+      .content { position: relative; z-index: 2; }
+
+      .kicker {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #2ee6e0;
+        margin-bottom: 26px;
+      }
+
+      h1 {
+        font-family: 'Space Grotesk Local', system-ui, sans-serif;
+        font-size: 116px;
+        font-weight: 700;
+        line-height: 0.92;
+        letter-spacing: -0.045em;
+      }
+
+      p {
+        margin-top: 30px;
+        font-size: 31px;
+        line-height: 1.34;
+        color: #a5a3b4;
+        max-width: 21ch;
+      }
+
+      .chips {
+        position: relative;
+        z-index: 2;
+        margin-top: 44px;
+        display: flex;
+        gap: 12px;
+      }
+
+      .chip {
+        padding: 11px 22px;
+        font-size: 20px;
+        font-weight: 600;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(6, 6, 10, 0.42);
+        color: #f4f3f7;
+      }
+
+      .domain {
+        position: absolute;
+        right: 86px;
+        bottom: 54px;
+        z-index: 2;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: #6c6a7c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+    <div class="grain"></div>
+
+    <div class="content">
+      <div class="kicker">Las Vegas</div>
+      <h1>Vegas This<br />Weekend</h1>
+      <p>Swipe through what&rsquo;s on. Save what looks good. Send it to your group.</p>
+    </div>
+
+    <div class="chips">
+      <span class="chip">Nightlife</span>
+      <span class="chip">Food &amp; Drink</span>
+      <span class="chip">Music</span>
+      <span class="chip">Shows</span>
+    </div>
+
+    <div class="domain">vegasthisweekend.com</div>
+  </body>
+</html>

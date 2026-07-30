@@ -10,26 +10,34 @@ good, share it with your group. No account, no planning session.
 
 ## Status
 
+**Live as of 29 Jul 2026**, with one thing outstanding — see [BACKLOG.md](BACKLOG.md).
+
 | Piece | State |
 |---|---|
-| Swipe stack, filters, saved list, share links, insider tips | Built and verified in-browser |
-| Admin panel: manual entry, event list, edit, tips | Built and verified in-browser |
-| AI URL extraction | Built; **needs `ANTHROPIC_API_KEY` to run** |
+| API | ✅ live — `https://api.vegasthisweekend.com` (Railway) |
+| Database | ✅ Postgres on Railway, migrations applied, **10 real events** |
+| Website | ✅ live — `https://vegasthisweekend.netlify.app` |
+| Website on the real domain | ⏳ DNS correct; **Netlify TLS certificate still provisioning** |
+| Swipe stack, filters, saved list, share links, insider tips | ✅ built, verified in-browser |
+| Admin panel: manual entry, list, edit, tips, duplicates, series | ✅ built, verified in-browser |
+| Analytics (9 custom events) | ✅ shipped — **needs the goals registered in Plausible to display** |
+| AI URL extraction | ✅ works; run live against real pages. Defeated by JS-rendered and login-walled sources — paste-text is the fallback |
+| Backend API + 161 tests | ✅ passing |
+| Schema migrations (Alembic) | ✅ in place, runs on deploy; `create_all` retired |
 | Image mirroring to Cloudflare R2 | Built; **needs R2 credentials to run** |
-| Backend API + 161 tests | Passing |
-| Schema migrations (Alembic) | In place; `create_all` retired |
-| Event data | **Still placeholder.** Fictional venues, flagged `is_sample` |
 | Eventbrite integration | Config placeholder only |
-| Deployed | No — Railway/Netlify accounts not yet created |
 
-Both credential-gated features degrade rather than break: without an Anthropic key the
-admin panel is manual-entry only and says so; without R2 the event saves and keeps its
-generated poster.
+Where credentials are missing, features degrade rather than break: no Anthropic key means
+the admin panel is manual-entry only and says so; no R2 means events save and keep their
+generated posters.
 
-Every seeded event is invented and every venue name is fictional. While any sample event
-is in the database the API reports `sample_data: true` and the app shows a banner saying
-so, which means fabricated listings cannot quietly pass as real ones. Delete the samples
-and the banner disappears on its own.
+**DNS** (all at Namecheap): apex `ALIAS → apex-loadbalancer.netlify.com`, `www CNAME →
+vegasthisweekend.netlify.app`, `api CNAME →` the Railway target.
+
+Production contains only real, hand-entered events — no sample data ever reached it. The
+seed script and its fictional venues remain for local development. While any sample event
+is present the API reports `sample_data: true` and the app shows a banner saying so, so
+fabricated listings cannot quietly pass as real ones.
 
 ---
 
@@ -302,33 +310,21 @@ match it, and `img-src` to the R2 bucket domain. The CSP currently names
 
 ## Known gaps
 
-- **Login-walled sources cannot be fetched by anything.** Instagram and Facebook posts
-  will not resolve server-side, by Claude or by us. That is what the "paste text instead"
-  box is for — it is the only path for a real slice of the PRD's stated sources.
-- **Extraction has never run against a live page.** The code path is built and unit
-  tested against mocked responses, but no `ANTHROPIC_API_KEY` has been configured yet, so
-  its behaviour on a real Eventbrite or venue page is unverified.
-- **Extraction costs money per paste** — roughly **$9/month** at 30–50 events a week on
-  Sonnet 5 (~$14 once its introductory pricing ends on 31 Aug 2026). Opus 5 would be ~$23
-  for no benefit on this task. `ANTHROPIC_MODEL` is configurable.
-- **`effort` is the next cost lever and is untuned.** It defaults to `high`; `medium`
-  would likely cut thinking tokens with no quality loss on a task this well specified.
-  Deliberately left alone until a live extraction can be measured — guessing at it
-  without data would just be a different kind of wrong.
-- **A series is generated once.** Editing a residency means editing each night. Fine at
-  26 occurrences; it would want a real recurrence model before it wants a hundred.
-- **Offset pagination** can skip or repeat an item if an event expires mid-scroll. The
-  client dedupes by id, so the visible symptom is at worst a slightly short page.
-- **Rate limiting is in-process**, so limits are per-instance. Fine at one instance; a
-  second one needs shared storage.
-- **"Return visits" is deliberately not instrumented** — cookieless analytics and no
-  accounts means there is no honest way to measure it until v2 brings accounts. The other
-  three PRD metrics are covered; see Analytics above.
-- **`img-src` in the CSP allows any https host.** Event images come from ticketing sites
-  and venue CDNs while R2 is unconfigured, so loading one reveals the visitor's IP to that
-  host — a small inconsistency with the app's otherwise no-third-parties stance. Mirroring
-  to R2 makes this tightenable to a single domain, and nothing breaks visually when it is,
-  because images that fail fall back to a generated poster.
+**One list, and it lives in [BACKLOG.md](BACKLOG.md)** — outstanding work, technical debt,
+and what is blocked on which dashboard. Keeping a second copy here only guarantees the two
+disagree.
+
+Two things worth knowing while reading the code, since they shape it:
+
+- **Login-walled and JS-rendered sources cannot be fetched by anything.** Instagram and
+  TikTok will not resolve server-side, by Claude or by us, and vegas.com renders its event
+  data client-side — measured, not assumed. That is what the "paste text instead" box is
+  for; it is the only path for a real slice of the PRD's stated sources.
+- **Extraction costs about $0.06 per URL**, measured live: ~26K input tokens for a real
+  venue page. That is ~$14/month at 50 events a week on Sonnet 5's introductory pricing,
+  ~$21 after 31 Aug 2026. Manual entry is free and is currently the primary workflow.
+  `ANTHROPIC_MODEL` is configurable; **Opus is off the table for this project** — it would
+  be ~$23/month for no benefit on a task this well specified.
 
 ---
 
@@ -368,11 +364,16 @@ Two deliberate constraints in `analytics.js`:
   ids, never share tokens. A test asserts the share token appears in no prop, because
   leaking it would quietly undo the privacy stance that made Plausible the right choice.
 
+**"Return visits" is deliberately not instrumented.** Cookieless analytics and no accounts
+means there is no honest way to measure it until v2 brings accounts. The other three PRD
+metrics are covered above.
+
 ---
 
-## Backlog
+## Design note: the Sober and Fitness filters
 
-### Two new filters: Sober and Fitness
+Both are wanted, neither is built — tracked as 4.1 and 4.2 in [BACKLOG.md](BACKLOG.md).
+The reasoning is recorded here because it is a modelling decision, not a task.
 
 Wanted, not yet built. They look like one task and are actually two, because they are
 different *kinds* of thing — and getting that wrong is the main risk here.
