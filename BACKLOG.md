@@ -26,6 +26,16 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 | B4 | **Bulk URL extraction** — paste a list, server-side queue, review each | `1e56386` |
 | B4a | Separate link fields on extract (they already existed as columns) | `d7ed64e` |
 | C10 | Extraction `effort` measured — see the note in `extraction.py` | `5b83047` |
+| C5 | **Rate limiting keyed on the real visitor**, not the proxy | `c40f2ff` |
+
+**C5 was a live bug, now confirmed rather than suspected.** The deployed API reported its
+socket peer as `100.64.0.2` — RFC 6598 shared space, Railway's internal proxy — so every
+visitor on earth shared one bucket and the 100/min public limits were 100/min *in total*.
+Asked the API directly via a new admin diagnostics endpoint instead of reasoning about it.
+
+The same measurement killed the obvious alternative: `X-Forwarded-For`'s first entry was
+`104.23.203.139`, a **Cloudflare edge address**, not the visitor. Keying on that would
+have traded one shared bucket for one bucket per Cloudflare PoP and looked like it worked.
 
 **Extraction cost, finally measured rather than estimated.** Prompt caching on the
 continuation loop took the worst observed run from **$0.48 to $0.17** and collapsed the

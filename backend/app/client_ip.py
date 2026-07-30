@@ -11,6 +11,21 @@ Uvicorn will read `X-Forwarded-For` itself, but only from peers it trusts, and
 `forwarded_allow_ips` defaults to 127.0.0.1. Railway's proxy is not localhost, so that
 never applied here.
 
+Measured against the deployed API, one request from a browser:
+
+    cf_connecting_ip       2600:880a:2800:4100:...      <- the actual visitor
+    x_forwarded_for_raw    104.23.203.139, 79.127.217.65
+    socket_peer            100.64.0.2
+
+Two things worth keeping. `100.64.0.2` is RFC 6598 shared address space — Railway's
+internal proxy — and it is what every visitor on earth was being keyed on.
+
+And the ordering below is not a preference, it is load-bearing: the left-most
+`X-Forwarded-For` entry here is `104.23.203.139`, which is a *Cloudflare edge* address,
+not the visitor. Falling back to X-Forwarded-For first would have swapped one shared
+bucket for a slightly larger set of shared buckets — everyone routed through the same
+Cloudflare PoP together — and looked like it worked.
+
 SECURITY — what trusting a header does and does not cost.
 
 These headers are only meaningful if the request genuinely came through Cloudflare. The
@@ -64,7 +79,9 @@ def client_ip(request: Request) -> str:
         return get_remote_address(request) or "unknown"
 
     sources = resolve(request)
-    # Cloudflare's own header first: it is a single value that Cloudflare overwrites,
+    # Cloudflare's own header first, and the order matters — see the measurement in the
+    # module docstring, where X-Forwarded-For's first entry was a Cloudflare edge
+    # address rather than the visitor. It is also a single value Cloudflare overwrites,
     # rather than a list a client can prepend to.
     return (
         sources["cf_connecting_ip"]
