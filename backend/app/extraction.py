@@ -65,6 +65,22 @@ MAX_CONTINUATIONS = 3
 WEB_FETCH_MAX_CONTENT_TOKENS: int | None = None
 EFFORT: str | None = None
 
+# Cache the stable prefix. This is the one lever that worked, and the only one aimed at a
+# measured cause rather than a hunch. Five runs against the same two pages:
+#
+#                         without caching          with caching
+#   Eventbrite (n=3)   $0.14 – $0.48  (3.4x)    $0.11 – $0.17  (1.5x)
+#   Venue page (n=2)   $0.20 – $0.25            $0.10 – $0.12
+#
+# The spread mattering more than the median is the point. The failure being fixed was
+# unpredictability — the same page costing 3.4x more on an unlucky run — and the worst
+# observed case fell from $0.48 to $0.17. Input tokens now read 4–16 per call with 56k–119k
+# coming from cache, which is the mechanism working rather than a coincidence.
+#
+# Median across all five: $0.12/URL, so roughly $27/month sync at 50 events a week, or
+# $13.50 through the Batch API.
+PROMPT_CACHING = True
+
 # How many times the model may fetch.
 #
 # Left at 4. Dropping it to 1 was tried, on the theory that fetch count was what made
@@ -267,6 +283,25 @@ def extract_event(*, url: str | None = None, text: str | None = None) -> Extract
         # that needs the reasoning.
         "thinking": {"type": "adaptive"},
     }
+    if PROMPT_CACHING:
+        # The one change that targets the measured cause rather than a guess.
+        #
+        # Two things get paid for repeatedly without this. Within a single extraction,
+        # a `pause_turn` is resolved by resending the whole conversation, so a run that
+        # pauses twice pays for the fetched page three times — that is what produced
+        # 31k / 89k / 131k input tokens on three runs against the same page. Across
+        # extractions, the system prompt and tool definitions are byte-identical every
+        # time and were being re-read at full price on every call.
+        #
+        # Top-level auto-placement rather than a hand-placed marker: it puts the
+        # breakpoint on the last cacheable block, which for a conversation that grows by
+        # one assistant turn per continuation is exactly where it needs to go, and it
+        # cannot drift out of step with the loop.
+        #
+        # Passed via extra_body because `messages.parse()` has no cache_control
+        # parameter of its own — it is a typed wrapper over the create call, and this is
+        # the documented way through it.
+        request["extra_body"] = {"cache_control": {"type": "ephemeral"}}
     if EFFORT is not None:
         request["output_config"] = {"effort": EFFORT}
     if url:
@@ -307,12 +342,17 @@ def extract_event(*, url: str | None = None, text: str | None = None) -> Extract
     # money out of pocket and worth being able to see rather than estimate.
     usage = getattr(response, "usage", None)
     if usage is not None:
+        # cache_write is logged too, not just cache_read: a read of zero across repeated
+        # calls is the signal that something is silently invalidating the prefix, and
+        # without the write figure there is no way to tell "not caching" from "cached
+        # but never hit".
         logger.info(
-            "extraction usage model=%s input=%s output=%s cache_read=%s",
+            "extraction usage model=%s input=%s output=%s cache_read=%s cache_write=%s",
             getattr(response, "model", settings.anthropic_model),
             getattr(usage, "input_tokens", None),
             getattr(usage, "output_tokens", None),
             getattr(usage, "cache_read_input_tokens", None),
+            getattr(usage, "cache_creation_input_tokens", None),
         )
 
     result = response.parsed_output
