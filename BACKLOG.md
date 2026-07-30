@@ -2,6 +2,35 @@
 
 Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
+## ✅ Shipped 30 Jul 2026
+
+| # | Item | Commit |
+|---|---|---|
+| C1 | Dropped the stale `railway.app` origin from the CSP | `7fc44b3` |
+| C2 | React error boundary — no more white-screen on a render error | `7fc44b3` |
+| C3 | OG image rendered and wired up; shared links preview properly | `7fc44b3` |
+| A1 | Full-screen card, chrome floating over the media | `db17b8b` |
+| A1a | Video playback — the field existed, the player never did | `db17b8b` |
+| A1b | Richer generated posters (bands + ghost word) | `db17b8b` |
+| A1c | Swipe labels moved to the stack, much louder | `db17b8b` |
+| A1d | Per-event Tickets / Website links, each hidden when absent | `db17b8b` |
+| A2 | Share panel: the URL, copy state, expiry, snapshot semantics | *below* |
+| A3 | Preview button — opens exactly what the recipient sees | *below* |
+
+Two bugs found by testing rather than by eye, both fixed:
+
+- **The share button stuck on "Creating link…".** `handleShare` awaited
+  `navigator.share`, so the button stayed busy for as long as the native sheet was
+  open — or forever if it never settled. The link already exists by that point, so the
+  busy state now clears before the hand-off.
+- **The swipe labels' real problem wasn't size.** They lived inside the card, so they
+  travelled with it and slid off the edge of the screen at exactly the moment you
+  needed to read them. Moving them to the stack fixed what making them bigger could not.
+
+Still to do from this group: nothing.
+
+---
+
 **Effort key:** **S** = under an hour · **M** = a few hours, may touch the schema · **L** = a full session or more.
 **Launch** = should be done before actively promoting the site. Everything else is real work, just not gating.
 
