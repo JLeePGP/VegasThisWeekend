@@ -17,6 +17,16 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 | A2 | Share panel: the URL, copy state, expiry, snapshot semantics | `a902ca5` |
 | A3 | Preview button — opens exactly what the recipient sees | `a902ca5` |
 | — | CSP: `media-src`, Plausible shim hash, Cloudflare beacon | `2fdf23a` |
+| 4.1 | **Sober filter** — `alcohol_free` column + its own switch, ANDs with categories | `d7ed64e` |
+| 4.2 | **Fitness** category | `d7ed64e` |
+| B1 | **Street address** + free Google Maps deep link (no API key) | `d7ed64e` |
+| B2 | **Multiple categories per event** — `primary vibe` + additive tag rows | `d7ed64e` |
+| — | `source_url` exposed publicly — the Website link had been dead | `d7ed64e` |
+
+**Migration `b2c7d41ae903` applied to production 30 Jul**, all 10 events intact.
+Deliberately additive — nothing dropped, renamed or rewritten — so it was safe to run
+without confirmed backups, and reversible. `neighborhood` is untouched and stays until
+real addresses are populated and checked; dropping it is a separate later step.
 
 **Deployed and verified live on 30 Jul**, including a video actually playing on
 `vegasthisweekend.com` (readyState 4, 480×854, playhead advancing).
