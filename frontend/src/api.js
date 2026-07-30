@@ -71,3 +71,24 @@ export const createShareList = (eventIds) =>
   request('/share', { method: 'POST', body: { event_ids: eventIds } });
 
 export const fetchShareList = (token, { signal } = {}) => request(`/share/${token}`, { signal });
+
+/**
+ * Fire-and-forget interaction counts.
+ *
+ * Does not go through `request`: this must never surface an error into the app, and it
+ * needs `keepalive` so a flush triggered by the page going away still completes.
+ */
+export function recordInteractions(items) {
+  if (!items?.length) return;
+  try {
+    fetch(`${API_BASE}/interactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // Blocked by an extension, offline, or the keepalive quota is exhausted. Counting
+    // is not worth an exception in the middle of a swipe.
+  }
+}

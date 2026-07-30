@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { trackDetailOpened, trackShareCreated } from '../analytics';
+import { trackDetailOpen, trackShareCreate } from '../analytics';
 import { createShareList } from '../api';
 import { MAX_SHARE_EVENTS } from '../constants';
 import { expiresInDays } from '../format';
@@ -23,7 +23,7 @@ export default function SavedScreen() {
   const [share, setShare] = useState(null); // { url, count, truncated, expiresAt, copied }
 
   const openDetail = useCallback((event) => {
-    trackDetailOpened({ vibe: event.vibe, source: 'saved' });
+    trackDetailOpen(event.id);
     setDetail(event);
   }, []);
 
@@ -50,7 +50,7 @@ export default function SavedScreen() {
 
       // Counted at creation, not at delivery: whether they then complete the native
       // share sheet is outside our knowledge, and the token itself is never sent.
-      trackShareCreated({ count: shared.length, truncated });
+      trackShareCreate();
 
       // Copy before offering the native sheet, so the panel can state truthfully whether
       // the link reached the clipboard rather than claiming it optimistically.

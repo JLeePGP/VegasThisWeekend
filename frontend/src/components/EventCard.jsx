@@ -1,4 +1,4 @@
-import { trackTicketClicked } from '../analytics';
+import { trackMapClick, trackTicketClick, trackWebsiteClick } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { whenLabel } from '../format';
 import { mapsUrl } from '../maps';
@@ -48,7 +48,7 @@ export default function EventCard({ event, isTop = true, onExpand }) {
               href={event.ticket_url}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => trackTicketClicked({ vibe: event.vibe })}
+              onClick={() => trackTicketClick(event.id)}
             >
               <IconTicket width={16} height={16} />
               Tickets
@@ -60,6 +60,7 @@ export default function EventCard({ event, isTop = true, onExpand }) {
               href={event.source_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWebsiteClick(event.id)}
             >
               <IconGlobe width={16} height={16} />
               Website
@@ -71,6 +72,7 @@ export default function EventCard({ event, isTop = true, onExpand }) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Map for ${event.venue}`}
+            onClick={() => trackMapClick(event.id)}
           >
             <IconPin width={16} height={16} />
             Map

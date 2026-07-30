@@ -4,7 +4,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'sha256-rikP6O8OvZlYRMZkxJ9ZM9m/LxculWr4DxAXvwZAF7c=' https://plausible.io https://static.cloudflareinsights.com; connect-src 'self' https://api.vegasthisweekend.com https://plausible.io https://cloudflareinsights.com; img-src 'self' data: https:; media-src 'self' https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://api.vegasthisweekend.com https://cloudflareinsights.com; img-src 'self' data: https:; media-src 'self' https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
 
 # CSP notes:
 #
@@ -14,12 +14,13 @@
 # (CloudFront and friends), so this is as broad as img-src for the same reason, and gets
 # tightened to the R2 domain at the same time img-src does.
 #
-# The sha256 allows exactly one inline script: the Plausible queue shim in index.html.
-# Without it that script is blocked, which is what was happening in production — custom
-# events fired before Plausible's deferred script loaded were dropped on the floor. The
-# hash covers the script's exact bytes, so editing that block by even one space breaks it;
-# the browser console prints the replacement hash when it does. Both this and the
-# plausible.io origins come out when first-party counters replace Plausible.
+# There is no longer an inline-script hash or a plausible.io origin here: analytics is
+# first-party, so the page loads no third-party script at all. If you ever add an inline
+# script back, the browser console prints the sha256 to add — it is not guessable.
+#
+# connect-src must keep allowing the API origin: interaction counts POST to
+# /interactions there, and a missing entry would show up as analytics quietly recording
+# nothing rather than as an error anyone notices.
 #
 # static.cloudflareinsights.com / cloudflareinsights.com are Cloudflare Web Analytics.
 # Cloudflare injects that beacon at the edge, so it never appears in this repo's HTML and

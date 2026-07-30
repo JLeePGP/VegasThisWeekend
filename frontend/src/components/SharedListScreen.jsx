@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { trackDetailOpened, trackSave, trackSharedListOpened } from '../analytics';
+import { trackDetailOpen, trackSave, trackShareOpen } from '../analytics';
 import { fetchShareList } from '../api';
 import { expiresInDays } from '../format';
 import { useSavedEvents } from '../store/savedEvents';
@@ -19,7 +19,7 @@ export default function SharedListScreen() {
   const [detail, setDetail] = useState(null);
 
   const openDetail = useCallback((event) => {
-    trackDetailOpened({ vibe: event.vibe, source: 'shared_list' });
+    trackDetailOpen(event.id);
     setDetail(event);
   }, []);
 
@@ -31,7 +31,7 @@ export default function SharedListScreen() {
       .then((data) => {
         // The real spread metric: links created only measures intent, this measures
         // reach. The token is deliberately not sent — only how many events it held.
-        trackSharedListOpened({ count: data.events.length });
+        trackShareOpen();
         setState({ status: 'ready', data, error: null });
       })
       .catch((error) => {
@@ -71,7 +71,7 @@ export default function SharedListScreen() {
 
   function saveAll() {
     unsaved.forEach((event) => {
-      trackSave({ source: 'shared_list', vibe: event.vibe });
+      trackSave(event.id);
       save(event);
     });
     show(`Added ${unsaved.length} ${unsaved.length === 1 ? 'event' : 'events'} to your list.`);

@@ -7,9 +7,9 @@ Every timestamp is stored and returned as UTC. Vegas-local reasoning ("tonight",
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -145,6 +145,61 @@ class EventTag(Base):
     tag: Mapped[str] = mapped_column(String(32), primary_key=True, index=True)
 
     event: Mapped[Event] = relationship(back_populates="tags")
+
+
+class StatCounter(Base):
+    """Aggregate interaction counts. One row per (day, metric, event).
+
+    Counters, not a log. There is no row per interaction, no session id, no IP, no user
+    agent and nothing that could be tied back to a person — which is both the point and
+    the reason this can replace a third-party analytics script rather than sit alongside
+    one. What it can answer that a cookieless pageview tool cannot is "which events are
+    people actually saving", because the count is attached to the event.
+
+    `day` is a plain Las Vegas calendar date, not the 5am listing day used for event
+    windows. A listing day answers "which night does this event belong to"; this answers
+    "when did people use the app", and a session at 2am is genuinely that morning's
+    usage, not the previous evening's.
+
+    Site-wide metrics store a null event_id. Postgres and SQLite both treat NULLs in a
+    unique index as distinct, so the uniqueness is enforced with two partial indexes
+    rather than one composite key.
+    """
+
+    __tablename__ = "stat_counters"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_new_id)
+
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    metric: Mapped[str] = mapped_column(String(32), nullable=False)
+    event_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("events.id", ondelete="CASCADE"), nullable=True
+    )
+    count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    __table_args__ = (
+        Index("ix_stat_counters_day_metric", "day", "metric"),
+        Index("ix_stat_counters_event", "event_id"),
+        # Two indexes rather than one: a single unique index over a nullable column
+        # would not stop duplicate site-wide rows, because NULL != NULL.
+        Index(
+            "uq_stat_counters_event",
+            "day",
+            "metric",
+            "event_id",
+            unique=True,
+            sqlite_where=text("event_id IS NOT NULL"),
+            postgresql_where=text("event_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_stat_counters_sitewide",
+            "day",
+            "metric",
+            unique=True,
+            sqlite_where=text("event_id IS NULL"),
+            postgresql_where=text("event_id IS NULL"),
+        ),
+    )
 
 
 class InsiderTip(Base):

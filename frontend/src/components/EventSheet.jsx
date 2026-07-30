@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { trackSave, trackTicketClicked, trackTipRevealed } from '../analytics';
+import { trackSave, trackTicketClick, trackTipReveal, trackWebsiteClick } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { fullDateLabel, rangeLabel } from '../format';
 import { mapsUrl } from '../maps';
@@ -81,6 +81,7 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
               href={event.source_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWebsiteClick(event.id)}
             >
               <IconGlobe width={16} height={16} />
               Event website
@@ -95,7 +96,7 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
                 aria-expanded={tipRevealed}
                 onClick={() => {
                   // Only count the reveal, not the collapse.
-                  if (!tipRevealed) trackTipRevealed({ vibe: event.vibe });
+                  if (!tipRevealed) trackTipReveal(event.id);
                   setTipRevealed((current) => !current);
                 }}
               >
@@ -116,7 +117,7 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
             href={event.ticket_url}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => trackTicketClicked({ vibe: event.vibe })}
+            onClick={() => trackTicketClick(event.id)}
           >
             <IconTicket width={18} height={18} />
             Tickets
@@ -127,7 +128,7 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
           className="btn btn--primary btn--block"
           disabled={isSaved}
           onClick={() => {
-            trackSave({ source: 'detail', vibe: event.vibe });
+            trackSave(event.id);
             onSave(event);
             onClose();
           }}

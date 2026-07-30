@@ -1,71 +1,117 @@
-// Plausible custom events, mapped to the PRD's success metrics.
+// First-party interaction counting.
 //
-// Three of the four metrics — swipe sessions, events saved per session, share links
-// created — are interactions, not pageviews, so none of them exist without this file.
+// Replaces Plausible. The reason is not cost: a cookieless pageview tool structurally
+// cannot answer the question this app actually has — *which events* are people saving —
+// because answering it means attaching a count to an event id, and sending event ids to
+// a third party is exactly what we had decided not to do. Counting them ourselves is
+// both more useful and more private: the server stores counters and nothing else, with
+// no session, no IP and no user agent (see backend/app/models.py StatCounter).
 //
-// Two rules:
+// Two rules this file exists to enforce:
 //
-// 1. **Analytics must never break the app.** Every call is wrapped: a blocked script, an
-//    ad blocker, or a Plausible outage has to be a silent no-op, not a crash mid-swipe.
-// 2. **Nothing identifying is ever sent.** Props carry categories and counts only — no
-//    event ids, no share tokens, no venue-level user history. The app's privacy stance is
-//    the reason Plausible was chosen over a cookie-based tool, and passing a share token
-//    here would quietly undo that.
+//   1. Analytics can never break the app. Every path is wrapped; a blocked request, an
+//      offline device or a 500 is a silent no-op, never an exception mid-swipe.
+//   2. Nothing identifying is ever sent. The payload is a list of {metric, event_id}
+//      and there is no third field to add one to.
 
-const enabled = () => typeof window !== 'undefined' && typeof window.plausible === 'function';
+import { recordInteractions } from './api';
 
-function track(name, props) {
-  if (!enabled()) return;
+// Swiping produces a burst of interactions, so they are batched rather than sent one
+// request per gesture. Flushed on whichever comes first.
+const FLUSH_AFTER_MS = 8000;
+const FLUSH_AT_COUNT = 20;
+// Matches the server's per-request ceiling.
+const MAX_BATCH = 50;
+
+let queue = [];
+let timer = null;
+
+function flush() {
+  if (timer) {
+    window.clearTimeout(timer);
+    timer = null;
+  }
+  if (queue.length === 0) return;
+
+  const batch = queue.slice(0, MAX_BATCH);
+  queue = queue.slice(MAX_BATCH);
+
   try {
-    // Plausible only accepts scalar props, so everything is coerced to a string.
-    const payload = props
-      ? Object.fromEntries(Object.entries(props).map(([key, value]) => [key, String(value)]))
-      : undefined;
-    window.plausible(name, payload ? { props: payload } : undefined);
+    // keepalive so a flush triggered by the page going away still completes. Unlike
+    // sendBeacon this can send application/json without tripping a CORS preflight it
+    // cannot satisfy, and it reports failures we can swallow deliberately.
+    recordInteractions(batch);
   } catch {
-    // Deliberately swallowed — see rule 1.
+    // Dropped on purpose. Losing a few counts is not worth a broken interaction, and
+    // retrying risks double-counting, which is worse than undercounting for a metric
+    // whose entire job is comparing events against each other.
+  }
+
+  // A queue longer than one batch keeps draining.
+  if (queue.length > 0) schedule();
+}
+
+function schedule() {
+  if (timer) return;
+  timer = window.setTimeout(flush, FLUSH_AFTER_MS);
+}
+
+function push(metric, eventId) {
+  try {
+    queue.push(eventId ? { metric, event_id: eventId } : { metric });
+    if (queue.length >= FLUSH_AT_COUNT) flush();
+    else schedule();
+  } catch {
+    // Nothing here can be allowed to surface.
   }
 }
 
-/**
- * A swipe decision, however it was made. Total volume answers "is anyone using it";
- * the save/skip split answers whether the catalog is any good.
- *
- * `method` distinguishes a real gesture from the on-screen buttons or arrow keys, which
- * tells you whether people are actually swiping or just clicking — worth knowing for a
- * product whose whole premise is the gesture.
- */
-export const trackSwipe = ({ direction, method }) => track('Swipe', { direction, method });
+if (typeof window !== 'undefined') {
+  // pagehide rather than unload: it fires on mobile Safari when the tab is backgrounded,
+  // which is how most sessions on this app actually end.
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
+}
 
-/**
- * Every save, from wherever it happened. Deliberately overlaps with a right-hand Swipe:
- * `Swipe` measures engagement volume, `Save` measures the saves metric, and keeping them
- * separate means neither has to be derived from the other in the dashboard.
- */
-export const trackSave = ({ source, vibe }) => track('Save', { source, vibe });
+// --- per-event -------------------------------------------------------------------
 
-/** A share link was created — the PRD's organic-spread metric. */
-export const trackShareCreated = ({ count, truncated }) =>
-  track('Share Created', { count, truncated });
+/** Swiped right, or saved from the detail sheet. */
+export const trackSave = (eventId) => push('save', eventId);
 
-/**
- * Someone opened a shared link. This is the actual spread signal: links created only
- * measures intent, this measures reach.
- */
-export const trackSharedListOpened = ({ count }) => track('Shared List Opened', { count });
+/** Swiped left. Paired with saves this gives a save rate, which is the number that
+ *  ranks events honestly — raw saves just rank by time spent near the top of the stack. */
+export const trackSkip = (eventId) => push('skip', eventId);
 
-/** Card expanded. Depth of interest beyond the swipe. */
-export const trackDetailOpened = ({ vibe, source }) => track('Detail Opened', { vibe, source });
+/** Opened the details. Depth of interest past the swipe. */
+export const trackDetailOpen = (eventId) => push('detail_open', eventId);
 
-/** Insider tip revealed — tells you whether the curation is worth the effort. */
-export const trackTipRevealed = ({ vibe }) => track('Tip Revealed', { vibe });
+/** Revealed an insider tip. Says whether curating them is worth the effort. */
+export const trackTipReveal = (eventId) => push('tip_reveal', eventId);
+
+/** Followed a ticket link out. The closest thing to a conversion this app has. */
+export const trackTicketClick = (eventId) => push('ticket_click', eventId);
+
+/** Followed the event's own website. */
+export const trackWebsiteClick = (eventId) => push('website_click', eventId);
+
+/** Opened directions. */
+export const trackMapClick = (eventId) => push('map_click', eventId);
+
+// --- site-wide -------------------------------------------------------------------
+
+/** A share link was created. Intent to share. */
+export const trackShareCreate = () => push('share_create');
+
+/** Someone opened a shared link. This is reach, as opposed to intent. */
+export const trackShareOpen = () => push('share_open');
 
 /** Ran out of cards. High numbers mean the catalog is too thin for the filters in use. */
-export const trackStackExhausted = ({ reason }) => track('Stack Exhausted', { reason });
+export const trackStackExhausted = () => push('stack_exhausted');
 
-/** Filters changed. Shows which vibes and price bands people actually reach for. */
-export const trackFilterChanged = ({ date, vibes, prices, alcoholFree }) =>
-  track('Filter Changed', { date, vibes, prices, alcoholFree });
+/** One per page load, as the denominator for everything above. */
+export const trackSessionStart = () => push('session_start');
 
-/** A ticket link was followed out. The closest thing to a conversion this app has. */
-export const trackTicketClicked = ({ vibe }) => track('Ticket Clicked', { vibe });
+// Exported for tests; not part of the normal surface.
+export const __flush = flush;

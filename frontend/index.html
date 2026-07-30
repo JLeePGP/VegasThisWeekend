@@ -50,25 +50,17 @@
     />
     <meta name="twitter:image" content="https://vegasthisweekend.com/og-image.jpg?v=1" />
 
-    <!-- Cookieless and GDPR-compliant by default; ignores localhost, so dev is silent. -->
-    <script
-      defer
-      data-domain="vegasthisweekend.com"
-      src="https://plausible.io/js/script.js"
-    ></script>
     <!--
-      Queue shim for custom events. The script above is deferred, so a swipe in the first
-      moments after load would otherwise call an undefined `plausible` and be dropped.
-      This buffers those calls until the real script replaces it. Required by Plausible
-      for custom events; see src/analytics.js for what gets sent.
+      No analytics script. Interaction counting is first-party — see src/analytics.js —
+      and Cloudflare covers traffic without a script at all, so this page loads nothing
+      from a third party.
+
+      Plausible used to live here. It was removed rather than kept alongside because it
+      structurally could not answer the question the app has: which *events* people save.
+      Answering that means attaching a count to an event id, and sending event ids to a
+      third party was the thing we had deliberately avoided. Counting them ourselves is
+      both more useful and more private.
     -->
-    <script>
-      window.plausible =
-        window.plausible ||
-        function () {
-          (window.plausible.q = window.plausible.q || []).push(arguments);
-        };
-    </script>
   </head>
   <body>
     <div id="root"></div>

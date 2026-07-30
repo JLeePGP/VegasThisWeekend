@@ -27,6 +27,7 @@ from ..images import ImageMirrorError, mirror_to_r2
 from ..limiter import limiter
 from ..models import Event, EventTag, InsiderTip
 from ..recurrence import expand_occurrences
+from ..stats import summary
 from ..schemas_admin import (
     AdminEventOut,
     AdminTipOut,
@@ -329,6 +330,25 @@ def deactivate_event(
     row.is_active = False
     db.commit()
     return AdminEventOut.from_event(row)
+
+
+# ------------------------------------------------------------------ stats
+
+
+@router.get("/stats")
+@limiter.limit("30/minute")
+def read_stats(
+    request: Request,
+    days: int = Query(30, ge=1, le=365, description="How many days back to include."),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Aggregate interaction counts, for the dashboard.
+
+    Not a response_model: the shape is a set of nested count dictionaries keyed by
+    metric name, and spelling that out as Pydantic models would add a layer to keep in
+    step with the Metric enum for no validation benefit on a read-only admin endpoint.
+    """
+    return summary(db, days=days)
 
 
 # ------------------------------------------------------------------ insider tips

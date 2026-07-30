@@ -4,6 +4,8 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 const TOKEN_KEY = 'vtw.admin.token';
 
+export const getStats = (days = 30) => request(`/admin/stats?days=${days}`);
+
 export const readToken = () => {
   try {
     return window.localStorage.getItem(TOKEN_KEY) ?? '';

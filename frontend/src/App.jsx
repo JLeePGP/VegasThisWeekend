@@ -1,6 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { trackFilterChanged } from './analytics';
 import DiscoverScreen from './components/DiscoverScreen';
 import SavedScreen from './components/SavedScreen';
 import SharedListScreen from './components/SharedListScreen';
@@ -17,17 +16,12 @@ export default function App() {
   // mode is a property of the route rather than something the screens negotiate.
   const immersive = useLocation().pathname === '/';
 
-  const changeFilters = useCallback((next) => {
-    setFilters(next);
-    // Which vibes and price bands people actually reach for — the clearest signal about
-    // what the catalog is missing.
-    trackFilterChanged({
-      date: next.date,
-      vibes: next.vibes.length ? next.vibes.join(',') : 'any',
-      prices: next.prices.length ? next.prices.join(',') : 'any',
-      alcoholFree: next.alcoholFree,
-    });
-  }, []);
+  // Filter changes are no longer counted. Plausible could carry an arbitrary string
+  // prop cheaply; first-party counters are (day, metric, event) rows, and a
+  // combinatorial filter string does not fit that shape without a table whose only job
+  // is saying which chips are popular. Worth adding if that question ever gets asked —
+  // it is not one of the four the PRD cares about.
+  const changeFilters = setFilters;
 
   return (
     <div className={immersive ? 'app app--immersive' : 'app'}>

@@ -6,6 +6,7 @@ import DuplicateDialog from './components/DuplicateDialog';
 import EventForm from './components/EventForm';
 import EventList from './components/EventList';
 import ExtractPanel from './components/ExtractPanel';
+import StatsPanel from './components/StatsPanel';
 import TipsPanel from './components/TipsPanel';
 
 const BLANK_RECURRENCE = { enabled: false, weekdays: [], until: '' };
@@ -287,6 +288,7 @@ export default function App() {
           ['add', editing ? 'Edit event' : 'Add event'],
           ['events', 'Events'],
           ['tips', 'Insider tips'],
+          ['stats', 'Stats'],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -357,6 +359,7 @@ export default function App() {
 
       {tab === 'events' && <EventList onEdit={startEditing} refreshKey={refreshKey} />}
       {tab === 'tips' && <TipsPanel />}
+      {tab === 'stats' && <StatsPanel />}
 
       {collisions && (
         <DuplicateDialog

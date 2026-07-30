@@ -30,6 +30,51 @@ class Vibe(str, Enum):
     LOCAL = "local"
 
 
+class Metric(str, Enum):
+    """What the app counts.
+
+    Deliberately a closed vocabulary: the recording endpoint is public, so anything
+    outside this list is rejected rather than becoming a row someone can spam into the
+    stats table.
+
+    Metrics split into two kinds. The first group is per-event — the counter carries an
+    event id and answers "which events land". The second is site-wide, where an event id
+    is meaningless and is stored as null.
+    """
+
+    # Per-event
+    SAVE = "save"
+    SKIP = "skip"
+    DETAIL_OPEN = "detail_open"
+    TIP_REVEAL = "tip_reveal"
+    TICKET_CLICK = "ticket_click"
+    WEBSITE_CLICK = "website_click"
+    MAP_CLICK = "map_click"
+
+    # Site-wide
+    SHARE_CREATE = "share_create"
+    SHARE_OPEN = "share_open"
+    STACK_EXHAUSTED = "stack_exhausted"
+    SESSION_START = "session_start"
+
+    @property
+    def is_per_event(self) -> bool:
+        return self in _PER_EVENT_METRICS
+
+
+_PER_EVENT_METRICS = frozenset(
+    {
+        Metric.SAVE,
+        Metric.SKIP,
+        Metric.DETAIL_OPEN,
+        Metric.TIP_REVEAL,
+        Metric.TICKET_CLICK,
+        Metric.WEBSITE_CLICK,
+        Metric.MAP_CLICK,
+    }
+)
+
+
 class PriceTier(str, Enum):
     """Buckets, not live prices — v1 explicitly does not track real-time pricing."""
 

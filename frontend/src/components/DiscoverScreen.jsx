@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  trackDetailOpened,
-  trackSave,
-  trackStackExhausted,
-  trackSwipe,
-} from '../analytics';
+import { trackDetailOpen, trackSave, trackSkip, trackStackExhausted } from '../analytics';
 import { DEFAULT_FILTERS } from '../constants';
 import useEvents from '../hooks/useEvents';
 import { useSavedEvents } from '../store/savedEvents';
@@ -43,8 +38,7 @@ export default function DiscoverScreen({ filters, onFiltersChange }) {
 
   const handleSave = useCallback(
     (event, method) => {
-      trackSwipe({ direction: 'save', method });
-      trackSave({ source: 'swipe', vibe: event.vibe });
+      trackSave(event.id);
       save(event);
     },
     [save],
@@ -52,14 +46,14 @@ export default function DiscoverScreen({ filters, onFiltersChange }) {
 
   const handleDismiss = useCallback(
     (event, method) => {
-      trackSwipe({ direction: 'skip', method });
+      trackSkip(event.id);
       dismiss(event.id);
     },
     [dismiss],
   );
 
   const openDetail = useCallback((event) => {
-    trackDetailOpened({ vibe: event.vibe, source: 'discover' });
+    trackDetailOpen(event.id);
     setDetail(event);
   }, []);
 
@@ -75,7 +69,7 @@ export default function DiscoverScreen({ filters, onFiltersChange }) {
     if (status !== 'ready' || hasMore || total === 0) return;
     if (!alreadyReportedEmpty.current) {
       alreadyReportedEmpty.current = true;
-      trackStackExhausted({ reason: 'seen_everything' });
+      trackStackExhausted();
     }
   }, [queue.length, status, hasMore, total]);
 
