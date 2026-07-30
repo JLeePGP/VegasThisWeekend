@@ -14,8 +14,25 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 | A1b | Richer generated posters (bands + ghost word) | `db17b8b` |
 | A1c | Swipe labels moved to the stack, much louder | `db17b8b` |
 | A1d | Per-event Tickets / Website links, each hidden when absent | `db17b8b` |
-| A2 | Share panel: the URL, copy state, expiry, snapshot semantics | *below* |
-| A3 | Preview button — opens exactly what the recipient sees | *below* |
+| A2 | Share panel: the URL, copy state, expiry, snapshot semantics | `a902ca5` |
+| A3 | Preview button — opens exactly what the recipient sees | `a902ca5` |
+| — | CSP: `media-src`, Plausible shim hash, Cloudflare beacon | `2fdf23a` |
+
+**Deployed and verified live on 30 Jul**, including a video actually playing on
+`vegasthisweekend.com` (readyState 4, 480×854, playhead advancing).
+
+Three things only appeared once a browser was pointed at the deployed site — none of
+them reproduce in dev, where Netlify's `_headers` is not applied:
+
+- **`media-src` was missing, so every event video was blocked in production.** With no
+  `media-src` the browser falls back to `default-src 'self'` and silently refuses
+  off-origin media, so the player rendered perfectly and played nothing. The two live
+  CloudFront videos were blocked from the moment the feature shipped.
+- **The Plausible queue shim had been blocked all along** — the violation hash matched
+  its exact bytes. Custom events fired before Plausible's deferred script loaded were
+  being dropped, which would read as flaky analytics rather than a policy problem.
+- **Cloudflare Web Analytics was enabled and blocked.** Its beacon is injected at the
+  edge, so it appears in no file in this repo — grepping the source would never find it.
 
 Two bugs found by testing rather than by eye, both fixed:
 
