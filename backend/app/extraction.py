@@ -18,6 +18,7 @@ Three rules shape this module.
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from urllib.parse import urlparse
 
@@ -35,6 +36,8 @@ MAX_TOKENS = 16_000
 MAX_CONTINUATIONS = 3
 
 _SAFE_URL_SCHEMES = {"http", "https"}
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionError(RuntimeError):
@@ -239,6 +242,18 @@ def extract_event(*, url: str | None = None, text: str | None = None) -> Extract
         raise ExtractionError("Claude declined to process that page. Enter the event manually.")
     if response.stop_reason == "max_tokens":
         raise ExtractionError("That page was too long to process. Try pasting the key details instead.")
+
+    # Cost observability: this project is free with no revenue, so per-extraction spend is
+    # money out of pocket and worth being able to see rather than estimate.
+    usage = getattr(response, "usage", None)
+    if usage is not None:
+        logger.info(
+            "extraction usage model=%s input=%s output=%s cache_read=%s",
+            getattr(response, "model", settings.anthropic_model),
+            getattr(usage, "input_tokens", None),
+            getattr(usage, "output_tokens", None),
+            getattr(usage, "cache_read_input_tokens", None),
+        )
 
     result = response.parsed_output
     if result is None:

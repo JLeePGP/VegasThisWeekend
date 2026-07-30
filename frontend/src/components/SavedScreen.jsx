@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { trackDetailOpened, trackShareCreated } from '../analytics';
 import { createShareList } from '../api';
 import { MAX_SHARE_EVENTS } from '../constants';
 import { useSavedEvents } from '../store/savedEvents';
@@ -16,6 +17,11 @@ export default function SavedScreen() {
   const [detail, setDetail] = useState(null);
   const [sharing, setSharing] = useState(false);
 
+  const openDetail = useCallback((event) => {
+    trackDetailOpened({ vibe: event.vibe, source: 'saved' });
+    setDetail(event);
+  }, []);
+
   async function handleShare() {
     setSharing(true);
     try {
@@ -23,6 +29,10 @@ export default function SavedScreen() {
       const { path } = await createShareList(shared.map((event) => event.id));
       const url = `${window.location.origin}${path}`;
       const trimmed = saved.length > MAX_SHARE_EVENTS;
+
+      // Counted at creation, not at delivery: whether they then complete the native
+      // share sheet is outside our knowledge, and the token itself is never sent.
+      trackShareCreated({ count: shared.length, truncated: trimmed });
 
       // The native share sheet is the better experience where it exists. If it is missing
       // or refuses (it needs a secure context and a user gesture), fall through to the
@@ -83,7 +93,7 @@ export default function SavedScreen() {
 
       <ul className="saved-list">
         {saved.map((event) => (
-          <SavedRow key={event.id} event={event} onOpen={setDetail} onRemove={remove} />
+          <SavedRow key={event.id} event={event} onOpen={openDetail} onRemove={remove} />
         ))}
       </ul>
 

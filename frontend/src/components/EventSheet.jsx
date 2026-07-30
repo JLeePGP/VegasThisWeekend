@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { trackSave, trackTicketClicked, trackTipRevealed } from '../analytics';
 import { priceLabel, vibeLabel } from '../constants';
 import { fullDateLabel, rangeLabel } from '../format';
 import { IconChevronDown, IconClose, IconSave, IconTicket, IconTip } from './Icons';
@@ -59,7 +60,11 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
                 type="button"
                 className="tip__toggle"
                 aria-expanded={tipRevealed}
-                onClick={() => setTipRevealed((current) => !current)}
+                onClick={() => {
+                  // Only count the reveal, not the collapse.
+                  if (!tipRevealed) trackTipRevealed({ vibe: event.vibe });
+                  setTipRevealed((current) => !current);
+                }}
               >
                 <IconTip className="tip__icon" width={20} height={20} />
                 Insider tip
@@ -78,6 +83,7 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
             href={event.ticket_url}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackTicketClicked({ vibe: event.vibe })}
           >
             <IconTicket width={18} height={18} />
             Tickets
@@ -88,6 +94,7 @@ export default function EventSheet({ event, open, onClose, onSave, isSaved }) {
           className="btn btn--primary btn--block"
           disabled={isSaved}
           onClick={() => {
+            trackSave({ source: 'detail', vibe: event.vibe });
             onSave(event);
             onClose();
           }}

@@ -25,6 +25,19 @@
       data-domain="vegasthisweekend.com"
       src="https://plausible.io/js/script.js"
     ></script>
+    <!--
+      Queue shim for custom events. The script above is deferred, so a swipe in the first
+      moments after load would otherwise call an undefined `plausible` and be dropped.
+      This buffers those calls until the real script replaces it. Required by Plausible
+      for custom events; see src/analytics.js for what gets sent.
+    -->
+    <script>
+      window.plausible =
+        window.plausible ||
+        function () {
+          (window.plausible.q = window.plausible.q || []).push(arguments);
+        };
+    </script>
   </head>
   <body>
     <div id="root"></div>

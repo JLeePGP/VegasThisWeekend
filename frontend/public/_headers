@@ -4,7 +4,23 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://plausible.io; connect-src 'self' https://api.vegasthisweekend.com https://plausible.io; img-src 'self' data: https://images.vegasthisweekend.com; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://plausible.io; connect-src 'self' https://vegasthisweekend-production.up.railway.app https://plausible.io; img-src 'self' data: https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+
+# CSP notes — both of these are load-bearing:
+#
+# connect-src must name the REAL API origin. It previously said
+# api.vegasthisweekend.com, which was only ever a placeholder: with that value the
+# deployed site cannot reach the API at all, and every fetch fails as a CSP violation
+# rather than a network error, which is a confusing thing to debug. Update this line if
+# the API ever moves behind a custom domain.
+#
+# img-src allows any https host because event images come from ticketing sites and venue
+# CDNs, and Cloudflare R2 is not configured yet. The trade-off is that loading a
+# third-party image reveals the visitor's IP to that host — a small inconsistency with
+# this app's otherwise cookieless, no-PII stance. Once R2 is set up and images are
+# mirrored, tighten this to `img-src 'self' data: https://<your-r2-domain>` and the app
+# stops talking to third parties entirely. Events without a usable image fall back to a
+# locally generated poster, so tightening it breaks nothing visually.
 
 # Hashed build assets are immutable; the HTML shell must never be cached.
 /assets/*

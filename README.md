@@ -322,7 +322,51 @@ match it, and `img-src` to the R2 bucket domain. The CSP currently names
 - **Rate limiting is in-process**, so limits are per-instance. Fine at one instance; a
   second one needs shared storage.
 - **"Return visits" is deliberately not instrumented** — cookieless analytics and no
-  accounts means there is no honest way to measure it until v2 brings accounts.
+  accounts means there is no honest way to measure it until v2 brings accounts. The other
+  three PRD metrics are covered; see Analytics above.
+- **`img-src` in the CSP allows any https host.** Event images come from ticketing sites
+  and venue CDNs while R2 is unconfigured, so loading one reveals the visitor's IP to that
+  host — a small inconsistency with the app's otherwise no-third-parties stance. Mirroring
+  to R2 makes this tightenable to a single domain, and nothing breaks visually when it is,
+  because images that fail fall back to a generated poster.
+
+---
+
+## Analytics
+
+Three of the PRD's four success metrics are interactions, not pageviews, so none of them
+exist without custom events. These fire from `frontend/src/analytics.js`.
+
+| Event | Props | Answers |
+|---|---|---|
+| `Swipe` | `direction` save/skip, `method` gesture/keyboard/button | Is anyone using it, and are they actually *swiping* |
+| `Save` | `source` swipe/detail/shared_list, `vibe` | Events saved per session — is the content resonating |
+| `Share Created` | `count`, `truncated` | Share links created |
+| `Shared List Opened` | `count` | **Actual reach.** Links created is intent; this is spread |
+| `Detail Opened` | `vibe`, `source` | Depth of interest past the swipe |
+| `Tip Revealed` | `vibe` | Whether curating tips is worth the effort |
+| `Stack Exhausted` | `reason` | Catalog too thin for the filters in use |
+| `Filter Changed` | `date`, `vibes`, `prices` | Which vibes and price bands people reach for |
+| `Ticket Clicked` | `vibe` | Closest thing to a conversion this app has |
+
+`Swipe` and `Save` deliberately overlap on a right-swipe: `Swipe` measures engagement
+volume, `Save` measures the saves metric, and keeping them separate means neither has to
+be derived from the other in the dashboard.
+
+**⚠️ Plausible needs each of these registered as a goal before it will display them.**
+The events are recorded either way, but the dashboard shows nothing until you add them:
+Plausible → Site Settings → Goals → Add goal → *Custom event* → type the name exactly as
+written above. Miss this and it looks like the instrumentation is broken.
+
+Two deliberate constraints in `analytics.js`:
+
+- **Analytics can never break the app.** Every call is wrapped, so a blocked script, an
+  ad blocker or a Plausible outage is a silent no-op rather than a crash mid-swipe. This
+  is covered by a browser test that removes `window.plausible` entirely and confirms
+  swiping and filtering still work.
+- **Nothing identifying is sent.** Props carry categories and counts only — never event
+  ids, never share tokens. A test asserts the share token appears in no prop, because
+  leaking it would quietly undo the privacy stance that made Plausible the right choice.
 
 ---
 

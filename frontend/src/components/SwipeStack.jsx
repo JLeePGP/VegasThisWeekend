@@ -35,7 +35,10 @@ export default function SwipeStack({
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
   const commit = useCallback(
-    (direction) => {
+    // `method` is passed through to the parent purely so analytics can tell a real
+    // gesture from the buttons or arrow keys — worth knowing for a product whose whole
+    // premise is the swipe.
+    (direction, method) => {
       if (committingRef.current || !top) return;
       committingRef.current = true;
       setLeaving(direction);
@@ -46,7 +49,7 @@ export default function SwipeStack({
         setLeaving(null);
         setDrag(null);
         committingRef.current = false;
-        (direction === 'save' ? onSave : onDismiss)(top);
+        (direction === 'save' ? onSave : onDismiss)(top, method);
       }, EXIT_MS);
     },
     [top, onSave, onDismiss],
@@ -54,7 +57,10 @@ export default function SwipeStack({
 
   useEffect(() => {
     if (!controlsRef) return;
-    controlsRef.current = { save: () => commit('save'), skip: () => commit('skip') };
+    controlsRef.current = {
+      save: () => commit('save', 'button'),
+      skip: () => commit('skip', 'button'),
+    };
   }, [controlsRef, commit]);
 
   const handlers = useSwipeable({
@@ -72,9 +78,9 @@ export default function SwipeStack({
       const flicked = gesture.velocity > FLICK_VELOCITY;
 
       if (travelled > COMMIT_DISTANCE || (flicked && travelled > FLICK_DISTANCE)) {
-        commit('save');
+        commit('save', 'gesture');
       } else if (travelled < -COMMIT_DISTANCE || (flicked && travelled < -FLICK_DISTANCE)) {
-        commit('skip');
+        commit('skip', 'gesture');
       } else {
         setDrag(null);
       }
@@ -92,10 +98,10 @@ export default function SwipeStack({
       if (keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
       if (keyEvent.key === 'ArrowLeft') {
         keyEvent.preventDefault();
-        commit('skip');
+        commit('skip', 'keyboard');
       } else if (keyEvent.key === 'ArrowRight') {
         keyEvent.preventDefault();
-        commit('save');
+        commit('save', 'keyboard');
       } else if (keyEvent.key === 'ArrowUp') {
         keyEvent.preventDefault();
         onExpand(top);

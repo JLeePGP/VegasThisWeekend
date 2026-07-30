@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  trackDetailOpened,
+  trackSave,
+  trackStackExhausted,
+  trackSwipe,
+} from '../analytics';
 import { DEFAULT_FILTERS } from '../constants';
 import useEvents from '../hooks/useEvents';
 import { useSavedEvents } from '../store/savedEvents';
@@ -35,8 +41,43 @@ export default function DiscoverScreen({ filters, onFiltersChange }) {
     if (status === 'ready' && hasMore && queue.length < PREFETCH_AT) loadMore();
   }, [status, hasMore, queue.length, loadMore]);
 
-  const handleDismiss = useCallback((event) => dismiss(event.id), [dismiss]);
-  const openDetail = useCallback((event) => setDetail(event), []);
+  const handleSave = useCallback(
+    (event, method) => {
+      trackSwipe({ direction: 'save', method });
+      trackSave({ source: 'swipe', vibe: event.vibe });
+      save(event);
+    },
+    [save],
+  );
+
+  const handleDismiss = useCallback(
+    (event, method) => {
+      trackSwipe({ direction: 'skip', method });
+      dismiss(event.id);
+    },
+    [dismiss],
+  );
+
+  const openDetail = useCallback((event) => {
+    trackDetailOpened({ vibe: event.vibe, source: 'discover' });
+    setDetail(event);
+  }, []);
+
+  // Running out of cards is a content signal, not just a UI state — a high rate means
+  // the catalog is too thin for the filters people are actually using. Fired once per
+  // exhaustion rather than on every render.
+  const alreadyReportedEmpty = useRef(false);
+  useEffect(() => {
+    if (queue.length > 0) {
+      alreadyReportedEmpty.current = false;
+      return;
+    }
+    if (status !== 'ready' || hasMore || total === 0) return;
+    if (!alreadyReportedEmpty.current) {
+      alreadyReportedEmpty.current = true;
+      trackStackExhausted({ reason: 'seen_everything' });
+    }
+  }, [queue.length, status, hasMore, total]);
 
   const filtersAreNarrowed =
     filters.vibes.length > 0 || filters.prices.length > 0 || filters.date !== DEFAULT_FILTERS.date;
@@ -103,7 +144,7 @@ export default function DiscoverScreen({ filters, onFiltersChange }) {
       <SwipeStack
         events={queue}
         controlsRef={controls}
-        onSave={save}
+        onSave={handleSave}
         onDismiss={handleDismiss}
         onExpand={openDetail}
         inputLocked={detail !== null}

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { trackDetailOpened, trackSave, trackSharedListOpened } from '../analytics';
 import { fetchShareList } from '../api';
 import { expiresInDays } from '../format';
 import { useSavedEvents } from '../store/savedEvents';
@@ -17,12 +18,22 @@ export default function SharedListScreen() {
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
   const [detail, setDetail] = useState(null);
 
+  const openDetail = useCallback((event) => {
+    trackDetailOpened({ vibe: event.vibe, source: 'shared_list' });
+    setDetail(event);
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     setState({ status: 'loading', data: null, error: null });
 
     fetchShareList(token, { signal: controller.signal })
-      .then((data) => setState({ status: 'ready', data, error: null }))
+      .then((data) => {
+        // The real spread metric: links created only measures intent, this measures
+        // reach. The token is deliberately not sent — only how many events it held.
+        trackSharedListOpened({ count: data.events.length });
+        setState({ status: 'ready', data, error: null });
+      })
       .catch((error) => {
         if (error.name === 'AbortError') return;
         setState({ status: 'error', data: null, error: error.message });
@@ -59,7 +70,10 @@ export default function SharedListScreen() {
   const unsaved = events.filter((event) => !savedIds.has(event.id));
 
   function saveAll() {
-    unsaved.forEach(save);
+    unsaved.forEach((event) => {
+      trackSave({ source: 'shared_list', vibe: event.vibe });
+      save(event);
+    });
     show(`Added ${unsaved.length} ${unsaved.length === 1 ? 'event' : 'events'} to your list.`);
   }
 
@@ -72,7 +86,7 @@ export default function SharedListScreen() {
 
       <ul className="saved-list">
         {events.map((event) => (
-          <SavedRow key={event.id} event={event} onOpen={setDetail} />
+          <SavedRow key={event.id} event={event} onOpen={openDetail} />
         ))}
       </ul>
 
