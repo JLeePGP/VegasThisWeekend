@@ -4,15 +4,21 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://plausible.io; connect-src 'self' https://vegasthisweekend-production.up.railway.app https://plausible.io; img-src 'self' data: https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://plausible.io; connect-src 'self' https://api.vegasthisweekend.com https://vegasthisweekend-production.up.railway.app https://plausible.io; img-src 'self' data: https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
 
 # CSP notes — both of these are load-bearing:
 #
-# connect-src must name the REAL API origin. It previously said
-# api.vegasthisweekend.com, which was only ever a placeholder: with that value the
-# deployed site cannot reach the API at all, and every fetch fails as a CSP violation
-# rather than a network error, which is a confusing thing to debug. Update this line if
-# the API ever moves behind a custom domain.
+# connect-src lists BOTH API origins on purpose, for the length of the cutover to the
+# custom domain. The CSP ships in this repo while VITE_API_BASE_URL lives in Netlify's
+# settings, so the two cannot change in the same instant: allowing both means whichever
+# one the current build points at keeps working, instead of the site breaking for the gap
+# between a commit and an environment-variable edit. Once the deployed build is confirmed
+# on api.vegasthisweekend.com, drop the railway.app entry — a stale allowed origin is
+# harmless but misleading.
+#
+# Getting this wrong is unusually unpleasant to debug: a blocked request surfaces as a CSP
+# violation in the console, not a network error, so the API looks healthy while the site
+# looks broken.
 #
 # img-src allows any https host because event images come from ticketing sites and venue
 # CDNs, and Cloudflare R2 is not configured yet. The trade-off is that loading a
