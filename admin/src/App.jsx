@@ -50,6 +50,7 @@ function toPayload(form, recurrence, { allowRecurrence }) {
     source_url: trimmedOrNull(form.source_url),
     is_active: form.is_active,
     mirror_image: form.mirror_image,
+    mirror_video: form.mirror_image,
   };
 
   if (allowRecurrence && recurrence.enabled) {
@@ -202,6 +203,8 @@ export default function App() {
       source_url: event.source_url ?? '',
       is_active: event.is_active,
       // Already stored; re-uploading the same file on every edit would be waste.
+      // The server refuses to re-mirror a URL that is already on our bucket anyway,
+      // so this is the polite version of a guarantee that lives there.
       mirror_image: false,
     });
     setRecurrence(BLANK_RECURRENCE);
@@ -219,8 +222,14 @@ export default function App() {
       const payload = toPayload(form, recurrence, { allowRecurrence: !editing });
 
       if (editing) {
-        await updateEvent(editing.id, payload);
-        setSaved({ message: `Updated "${payload.name}".` });
+        // The edit path mirrors media too, so it reports the same warning a create does.
+        // It used to throw the result away, which meant adding a video that failed to
+        // copy looked exactly like one that worked.
+        const updated = await updateEvent(editing.id, payload);
+        setSaved({
+          message: `Updated "${payload.name}".`,
+          warning: updated.media_warning,
+        });
       } else {
         const result = await createEvent(payload, { force });
         const count = result.created.length;
@@ -229,7 +238,7 @@ export default function App() {
             count === 1
               ? `Saved "${payload.name}".`
               : `Saved ${count} nights of "${payload.name}".`,
-          warning: result.image_warning,
+          warning: result.media_warning,
         });
 
         if (queuedDraft) {
@@ -372,7 +381,10 @@ export default function App() {
             {saved && (
               <div className="banner" data-tone={saved.warning ? 'warn' : 'ok'}>
                 {saved.message}
-                {saved.warning ? ` Image not mirrored: ${saved.warning}` : ''}
+                {/* Says "still points at" rather than "not mirrored" because what
+                    matters is the consequence: the card loads from someone else's
+                    server, which sees every visitor who opens it. */}
+                {saved.warning ? ` Media still points at its original host — ${saved.warning}` : ''}
               </div>
             )}
 

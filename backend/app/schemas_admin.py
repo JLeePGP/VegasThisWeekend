@@ -176,12 +176,32 @@ class DuplicateWarning(BaseModel):
     existing: list[AdminEventOut]
 
 
-class EventWriteOut(BaseModel):
+class MediaMirrorResult(BaseModel):
+    """How the R2 copy went. Named for media rather than images because it now covers
+    video too, and a field called `image_warning` carrying a video failure is the kind of
+    thing that gets read past."""
+
+    media_mirrored: bool = False
+    # Populated when saving succeeded but the copy did not — the event is live either
+    # way, using the original URL, or a generated poster if that URL later breaks.
+    #
+    # This is not cosmetic. An unmirrored URL means every visitor's browser fetches from
+    # that third-party host, handing it their IP address and the page they were on, which
+    # is the one thing this app otherwise never does.
+    media_warning: str | None = None
+
+
+class EventWriteOut(MediaMirrorResult):
     created: list[AdminEventOut]
-    image_mirrored: bool
-    # Populated when saving succeeded but the image copy did not — the event is live
-    # either way, using its generated poster.
-    image_warning: str | None = None
+
+
+class EventUpdateOut(AdminEventOut, MediaMirrorResult):
+    """An edited event plus how its media copy went.
+
+    A separate model rather than two extra fields on AdminEventOut: on a list row those
+    fields would always read "not mirrored, no warning", which looks like a statement
+    about the event and is really just "this response was not a write".
+    """
 
 
 class ExtractIn(BaseModel):

@@ -115,10 +115,100 @@ class TestCreateEvent:
         response = admin_client.post("/admin/events", json=payload)
         assert response.status_code == 201
         body = response.json()
-        assert body["image_mirrored"] is False
-        assert "R2" in body["image_warning"]
+        assert body["media_mirrored"] is False
+        assert "R2" in body["media_warning"]
         # The event is live regardless; the image just was not copied.
         assert body["created"][0]["image_url"] == "https://example.com/poster.jpg"
+
+    def test_a_video_that_cannot_be_mirrored_warns_too(self, admin_client):
+        payload = event_payload(
+            video_url="https://cdn.example.com/clip.mp4", mirror_video=True
+        )
+        body = admin_client.post("/admin/events", json=payload).json()
+        assert "video" in body["media_warning"]
+
+    def test_both_failures_are_reported_not_just_the_first(self, admin_client):
+        """One field carries both messages, so a video failure cannot be swallowed by an
+        image failure happening first."""
+        payload = event_payload(
+            image_url="https://example.com/poster.jpg",
+            video_url="https://cdn.example.com/clip.mp4",
+            # The shared payload helper turns image mirroring off by default.
+            mirror_image=True,
+        )
+        warning = admin_client.post("/admin/events", json=payload).json()["media_warning"]
+        assert "image" in warning and "video" in warning
+
+
+class TestEditReportsMirroring:
+    """An edit is the other way an unmirrored third-party URL gets onto a card, and it
+    used to discard the outcome entirely."""
+
+    def test_an_edit_reports_the_warning(self, admin_client):
+        created = admin_client.post("/admin/events", json=event_payload()).json()
+        event_id = created["created"][0]["id"]
+
+        updated = admin_client.put(
+            f"/admin/events/{event_id}",
+            json=event_payload(video_url="https://cdn.example.com/clip.mp4"),
+        )
+        assert updated.status_code == 200
+        assert "video" in updated.json()["media_warning"]
+
+    def test_an_edit_with_no_media_reports_nothing(self, admin_client):
+        created = admin_client.post("/admin/events", json=event_payload()).json()
+        event_id = created["created"][0]["id"]
+        body = admin_client.put(f"/admin/events/{event_id}", json=event_payload()).json()
+        assert body["media_warning"] is None
+        assert body["media_mirrored"] is False
+
+    def test_an_edit_still_returns_the_event_itself(self, admin_client):
+        """The extra fields ride along with the event; they do not replace it."""
+        created = admin_client.post("/admin/events", json=event_payload()).json()
+        event_id = created["created"][0]["id"]
+        body = admin_client.put(
+            f"/admin/events/{event_id}", json=event_payload(name="Renamed")
+        ).json()
+        assert body["name"] == "Renamed"
+        assert body["id"] == event_id
+
+
+class TestAlreadyMirrored:
+    def test_a_url_already_on_our_bucket_is_left_alone(self, monkeypatch):
+        """Without this, every edit re-downloads the event's own R2 object and uploads it
+        again under a fresh key, orphaning the old one. Once per edit, forever."""
+        from app.config import get_settings
+        from app.routers.admin import _mirror_or_keep
+
+        settings = get_settings()
+        monkeypatch.setattr(
+            settings, "r2_public_base_url", "https://media.example.com", raising=False
+        )
+        url = "https://media.example.com/events/abc123.jpg"
+
+        # A mirror attempt would need the network; reaching it at all fails the test.
+        monkeypatch.setattr(
+            "app.routers.admin.mirror_to_r2",
+            lambda *a, **k: pytest.fail("re-mirrored a URL that was already ours"),
+        )
+        assert _mirror_or_keep(url, wanted=True, kind="image") == (url, False, None)
+
+    def test_a_lookalike_host_is_still_mirrored(self, monkeypatch):
+        """`media.example.com.evil.test` must not pass as our bucket. The trailing slash
+        in the comparison is what stops a prefix match from being enough."""
+        from app.config import get_settings
+        from app.routers.admin import _mirror_or_keep
+
+        settings = get_settings()
+        monkeypatch.setattr(
+            settings, "r2_public_base_url", "https://media.example.com", raising=False
+        )
+        url, mirrored, warning = _mirror_or_keep(
+            "https://media.example.com.evil.test/x.jpg", wanted=True, kind="image"
+        )
+        # R2 is unconfigured in tests, so it reports that rather than silently passing.
+        assert mirrored is False
+        assert warning is not None
 
 
 class TestDuplicates:

@@ -43,6 +43,7 @@ from ..schemas_admin import (
     AdminTipOut,
     DuplicateWarning,
     EventWriteIn,
+    EventUpdateOut,
     EventWriteOut,
     ExtractedDraft,
     ExtractIn,
@@ -201,6 +202,14 @@ def _mirror_or_keep(
     """
     if not url or not wanted:
         return url, False, None
+    # Already ours. Without this, editing an event re-downloads its own R2 object and
+    # uploads it again under a fresh key, leaving the old one orphaned in the bucket —
+    # once per edit, forever. The admin form does send a "don't re-mirror" flag when it
+    # loads an event, but a check that depends on the client getting a checkbox right is
+    # not a check.
+    base = settings.r2_public_base_url.rstrip("/")
+    if base and url.startswith(f"{base}/"):
+        return url, False, None
     if not settings.r2_enabled:
         return url, False, f"R2 is not configured, so the {kind} was not mirrored."
     try:
@@ -319,19 +328,19 @@ def create_events(
 
     return EventWriteOut(
         created=[AdminEventOut.from_event(event) for event in created],
-        image_mirrored=mirrored,
-        image_warning=warning,
+        media_mirrored=mirrored,
+        media_warning=warning,
     )
 
 
-@router.put("/events/{event_id}", response_model=AdminEventOut)
+@router.put("/events/{event_id}", response_model=EventUpdateOut)
 @limiter.limit("20/minute")
 def replace_event(
     request: Request,
     payload: EventWriteIn,
     event_id: str = Path(pattern=ID_PATTERN),
     db: Session = Depends(get_db),
-) -> AdminEventOut:
+) -> EventUpdateOut:
     row = db.get(Event, event_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Event not found.")
@@ -341,7 +350,10 @@ def replace_event(
             detail="A series is generated once on create; edit each night individually.",
         )
 
-    image_url, video_url, _, _ = _resolve_media(payload)
+    # An edit is the other way an unmirrored third-party URL gets onto a card, and it
+    # used to discard the outcome entirely — adding a video that failed to copy said
+    # nothing at all.
+    image_url, video_url, mirrored, warning = _resolve_media(payload)
 
     row.name = payload.name
     row.venue = payload.venue
@@ -368,7 +380,11 @@ def replace_event(
 
     db.commit()
     cache.invalidate()
-    return AdminEventOut.from_event(row)
+    return EventUpdateOut(
+        **AdminEventOut.from_event(row).model_dump(),
+        media_mirrored=mirrored,
+        media_warning=warning,
+    )
 
 
 @router.post("/events/{event_id}/deactivate", response_model=AdminEventOut)

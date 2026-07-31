@@ -215,8 +215,11 @@ export default function EventForm({
         <label className="checkbox">
           <input type="checkbox" checked={value.mirror_image} onChange={set('mirror_image')} />
           <span>
-            Copy image to R2
-            <small>Venue URLs break; a mirrored copy does not.</small>
+            Copy media to R2
+            <small>
+              Venue URLs break; a mirrored copy does not. It also keeps visitors&rsquo; browsers
+              from ever contacting the venue&rsquo;s server, which would see who opened the card.
+            </small>
           </span>
         </label>
       </div>
