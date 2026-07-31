@@ -2,6 +2,66 @@
 
 Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
+---
+
+## Session close — 30 Jul 2026
+
+Session ended here. John moves to **adding events and finding users**; the build work
+pauses.
+
+### Links
+
+| What | Where |
+|---|---|
+| Site | https://vegasthisweekend.com |
+| API | https://api.vegasthisweekend.com |
+| Admin panel | `cd admin && npm run dev` → http://127.0.0.1:5174 — local only, never deployed |
+| Repo | https://github.com/JLeePGP/VegasThisWeekend |
+| Behaviour analytics | Admin panel → **Stats** tab |
+| Traffic analytics | Cloudflare → `vegasthisweekend.com` → Analytics & Logs → Traffic |
+| Extraction spend | https://console.anthropic.com → Usage |
+| API health | Railway → the API service → Metrics |
+
+Full detail on all four analytics surfaces is in the README.
+
+### State at close
+
+- 293 tests passing; frontend and admin bundles both build
+- Working tree clean, everything pushed through `e929761`
+- 10 real events in production, no sample data
+- `ANTHROPIC_API_KEY` set on Railway — extraction and the bulk queue are **live**, on
+  `claude-sonnet-5`
+- Audited: the key cannot reach an HTTP response. API errors are re-raised carrying the
+  status code only, never the SDK's exception text
+
+### What is built but not yet switched on
+
+All of it is dashboard work, all of it in [OPERATIONS.md](OPERATIONS.md) with the check
+that proves each one worked — most fail silently, which is the whole reason those checks
+are written down.
+
+1. **R2 credentials** — media mirroring is inert without them, so cards still load from
+   venue CDNs, which see every visitor who opens them
+2. **Cloudflare cache rule** — the API sends the caching headers already; Cloudflare
+   ignores them until the rule exists (`cf-cache-status` currently reads `DYNAMIC`)
+3. **Web Analytics toggle** — confirmed not currently injecting, but confirm the toggle
+4. **Proxy shared secret** — two-stage; stage 1 rejects nothing and is safe to deploy first
+5. **Backups** — turn on scheduled snapshots, run `scripts/verify_backup.py`, and restore
+   one by hand at least once
+
+### Two things to watch once real users arrive
+
+- **`stack_exhausted`** in the Stats tab. It means people ran out of cards for the filters
+  they picked — the earliest and clearest signal that the catalog is too thin.
+- **`share_open` vs `share_create`.** Created is intent; opened is actual reach. If the gap
+  is wide, links are being made and not travelling.
+
+### Suggested first move next session
+
+Expose the deployed commit SHA on `/health`. Railway already provides it in the
+environment, and it turns "is my change actually live?" into a single curl — this session
+needed a contrived probe to answer that question without writing to production.
+
 ## ✅ Shipped 30 Jul 2026
 
 | # | Item | Commit |

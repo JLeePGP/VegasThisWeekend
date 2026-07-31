@@ -8,30 +8,60 @@ good, share it with your group. No account, no planning session.
 
 ---
 
+## Where everything lives
+
+| What | Link |
+|---|---|
+| **The site** | https://vegasthisweekend.com |
+| **API** | https://api.vegasthisweekend.com |
+| **Admin panel** | http://127.0.0.1:5174 — **runs on your machine only**, see below |
+| Repo | https://github.com/JLeePGP/VegasThisWeekend |
+| What's shipped and what's next | [BACKLOG.md](BACKLOG.md) |
+| Dashboard steps still to do | [OPERATIONS.md](OPERATIONS.md) |
+
+**The admin panel is not deployed and never will be.** It is a local tool that talks to the
+live API:
+
+```bash
+cd admin
+npm install     # first time only
+npm run dev     # → http://127.0.0.1:5174
+```
+
+It binds to loopback only, so it is not reachable from your network. `admin/.env` points it
+at production; sign in with the **production** `ADMIN_TOKEN` (the one in
+`Keys/VTW-admin-tokens.txt`), not the local one. Everything you enter there lands in the
+live database immediately — the header says `writing to production` in red when it is.
+
+---
+
 ## Status
 
-**Live as of 30 Jul 2026** at `https://vegasthisweekend.com` — HTTPS, `www` redirecting to
-the apex, behind Cloudflare. Open work is in [BACKLOG.md](BACKLOG.md).
+**Live as of 30 Jul 2026.** HTTPS, `www` redirecting to the apex, behind Cloudflare.
 
 | Piece | State |
 |---|---|
-| API | ✅ live — `https://api.vegasthisweekend.com` (Railway) |
+| API | ✅ live (Railway) |
 | Database | ✅ Postgres on Railway, migrations applied, **10 real events** |
-| Website | ✅ live — `https://vegasthisweekend.com` (Netlify, proxied through Cloudflare) |
+| Website | ✅ live (Netlify, proxied through Cloudflare) |
 | HTTPS + canonical host | ✅ `http` → `https` 301, `www` → apex 301, HSTS set |
-| Bundle → API cutover | ✅ deployed bundle calls `api.vegasthisweekend.com` only |
-| Swipe stack, filters, saved list, share links, insider tips | ✅ built, verified in-browser |
+| Swipe stack, full-screen cards, video, filters, saved list, share links, tips | ✅ built, verified in-browser |
+| Sober + Fitness filters, multi-category tagging, street address & Maps link | ✅ shipped |
 | Admin panel: manual entry, list, edit, tips, duplicates, series | ✅ built, verified in-browser |
-| Analytics (9 custom events) | ✅ shipped — **needs the goals registered in Plausible to display** |
-| AI URL extraction | ✅ works; run live against real pages. Defeated by JS-rendered and login-walled sources — paste-text is the fallback |
-| Backend API + 161 tests | ✅ passing |
+| Analytics | ✅ first-party counters + admin Stats tab. **No third-party script on the page at all** |
+| AI URL extraction (single + bulk queue) | ✅ live — `ANTHROPIC_API_KEY` set, running `claude-sonnet-5` |
+| Backend API + 293 tests | ✅ passing |
 | Schema migrations (Alembic) | ✅ in place, runs on deploy; `create_all` retired |
-| Image mirroring to Cloudflare R2 | Built; **needs R2 credentials to run** |
+| Edge caching, batched counters, in-process read cache | ✅ shipped — **needs the Cloudflare cache rule to take effect** |
+| Media mirroring to Cloudflare R2 (images + video) | Built; **needs R2 credentials to run** |
+| Origin locked to Cloudflare (shared secret) | Built; **needs the Transform Rule + the env var** |
+| Backup verification script | Built; **needs running once against production** |
 | Eventbrite integration | Config placeholder only |
 
-Where credentials are missing, features degrade rather than break: no Anthropic key means
-the admin panel is manual-entry only and says so; no R2 means events save and keep their
-generated posters.
+Where credentials are missing, features degrade rather than break: no R2 means events save
+and keep their generated posters; no proxy secret means rate limiting works as it did
+before. The remaining setup is all dashboard work — [OPERATIONS.md](OPERATIONS.md) has each
+step and the check that proves it actually worked, because most of them fail silently.
 
 **DNS** (all at Namecheap): apex `ALIAS → apex-loadbalancer.netlify.com`, `www CNAME →
 vegasthisweekend.netlify.app`, `api CNAME →` the Railway target.
@@ -330,51 +360,77 @@ Two things worth knowing while reading the code, since they shape it:
 
 ---
 
-## Analytics
+## Analytics — where to actually look
 
-Three of the PRD's four success metrics are interactions, not pageviews, so none of them
-exist without custom events. These fire from `frontend/src/analytics.js`.
+There are four places, and they answer different questions. Plausible was retired; the page
+now loads **no third-party analytics script at all**.
 
-| Event | Props | Answers |
-|---|---|---|
-| `Swipe` | `direction` save/skip, `method` gesture/keyboard/button | Is anyone using it, and are they actually *swiping* |
-| `Save` | `source` swipe/detail/shared_list, `vibe` | Events saved per session — is the content resonating |
-| `Share Created` | `count`, `truncated` | Share links created |
-| `Shared List Opened` | `count` | **Actual reach.** Links created is intent; this is spread |
-| `Detail Opened` | `vibe`, `source` | Depth of interest past the swipe |
-| `Tip Revealed` | `vibe` | Whether curating tips is worth the effort |
-| `Stack Exhausted` | `reason` | Catalog too thin for the filters in use |
-| `Filter Changed` | `date`, `vibes`, `prices` | Which vibes and price bands people reach for |
-| `Ticket Clicked` | `vibe` | Closest thing to a conversion this app has |
+### 1. Admin panel → **Stats** tab — *what people do*
 
-`Swipe` and `Save` deliberately overlap on a right-swipe: `Swipe` measures engagement
-volume, `Save` measures the saves metric, and keeping them separate means neither has to
-be derived from the other in the dashboard.
+The one that matters. Run the admin panel locally (`cd admin && npm run dev`) and open the
+Stats tab. Time range switches between 7 / 30 / 90 days.
 
-**⚠️ Plausible needs each of these registered as a goal before it will display them.**
-The events are recorded either way, but the dashboard shows nothing until you add them:
-Plausible → Site Settings → Goals → Add goal → *Custom event* → type the name exactly as
-written above. Miss this and it looks like the instrumentation is broken.
+It answers **which events land**, which is the question no third-party tool could answer,
+because the frontend deliberately never sends event ids to anyone else.
 
-Two deliberate constraints in `analytics.js`:
+| Counter | Answers |
+|---|---|
+| `session_start` | Visits |
+| `save` / `skip` | Per event and in total — the raw signal |
+| **Save rate** | Of the people who *decided*, how many wanted it. Raw saves just rank by how long a card sat near the top of the stack |
+| `detail_open` | Depth of interest past the swipe |
+| `ticket_click`, `website_click`, `map_click` | Closest thing to a conversion this app has |
+| `tip_reveal` | Whether curating tips is worth the effort |
+| `share_create` vs `share_open` | Intent vs **actual reach** — created is a wish, opened is spread |
+| `stack_exhausted` | Catalog too thin for the filters in use. **Watch this one early** — it tells you to add more events |
 
-- **Analytics can never break the app.** Every call is wrapped, so a blocked script, an
-  ad blocker or a Plausible outage is a silent no-op rather than a crash mid-swipe. This
-  is covered by a browser test that removes `window.plausible` entirely and confirms
-  swiping and filtering still work.
-- **Nothing identifying is sent.** Props carry categories and counts only — never event
-  ids, never share tokens. A test asserts the share token appears in no prop, because
-  leaking it would quietly undo the privacy stance that made Plausible the right choice.
+Save rates from fewer than 5 decisions are dimmed, because one save out of one view is 100%
+and means nothing.
 
-**"Return visits" is deliberately not instrumented.** Cookieless analytics and no accounts
-means there is no honest way to measure it until v2 brings accounts. The other three PRD
-metrics are covered above.
+**What it stores:** counts per day, per metric, per event. No sessions, no IP addresses,
+nothing that identifies anyone — the table has nowhere to put a person, and a test asserts
+that.
+
+### 2. Cloudflare dashboard — *how much traffic*
+
+`vegasthisweekend.com` zone → **Analytics & Logs → Traffic**. Pageviews, countries,
+bandwidth, threats blocked. Free, comes from proxying alone, and sees nothing about swipes.
+It complements the Stats tab rather than competing with it.
+
+This is server-side traffic analytics, **not** Web Analytics (the RUM beacon) — that one is
+deliberately off, and the CSP would block it anyway.
+
+### 3. Anthropic Console — *what extraction costs*
+
+https://console.anthropic.com → Usage. Extraction runs on `claude-sonnet-5`. Measured at
+**$0.13–$0.35 per URL**, so roughly $5–7/month at ~50 events/week. Set a spend limit; it
+bounds every failure mode at once.
+
+### 4. Railway — *is the API healthy*
+
+The service's Metrics tab: memory, CPU, request volume. Where you look when something feels
+slow rather than wrong.
 
 ---
 
 ## Design note: the Sober and Fitness filters
 
-Both are wanted, neither is built — tracked as 4.1 and 4.2 in [BACKLOG.md](BACKLOG.md).
+**Both shipped.** The design decision behind them is still worth knowing, because it looks
+like an inconsistency until you see why.
+
+Fitness is a normal category and sits with the rest. **Sober is not a category** — it is
+`Event.alcohol_free`, a separate switch that sits apart from the chips.
+
+The reason: vibe filters combine with **OR**. If sober were just another vibe, picking
+Nightlife + Sober would return *all nightlife including bars, plus all sober events* — and
+the one thing a sober user actually wants, **sober nightlife**, is the single combination
+that could not be expressed. Alcohol-free has to AND with the categories, so it cannot live
+among them.
+
+One rule the extraction prompt enforces: set `alcohol_free` only on an **explicit** signal
+("dry", "sober", "alcohol-free", "no bar"). A page not mentioning alcohol is not evidence.
+Guessing optimistically sends someone in recovery to a bar — the only failure mode in this
+project that hurts a person.
 The reasoning is recorded here because it is a modelling decision, not a task.
 
 Wanted, not yet built. They look like one task and are actually two, because they are
