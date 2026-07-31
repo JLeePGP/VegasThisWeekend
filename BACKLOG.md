@@ -15,7 +15,7 @@ pauses.
 |---|---|
 | Site | https://vegasthisweekend.com |
 | API | https://api.vegasthisweekend.com |
-| Admin panel | `cd admin && npm run dev` → http://127.0.0.1:5174 — local only, never deployed |
+| Admin panel | `cd admin && npm run dev` → http://localhost:5174 — local only, never deployed |
 | Repo | https://github.com/JLeePGP/VegasThisWeekend |
 | Behaviour analytics | Admin panel → **Stats** tab |
 | Traffic analytics | Cloudflare → `vegasthisweekend.com` → Analytics & Logs → Traffic |

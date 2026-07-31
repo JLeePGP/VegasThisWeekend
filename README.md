@@ -14,7 +14,7 @@ good, share it with your group. No account, no planning session.
 |---|---|
 | **The site** | https://vegasthisweekend.com |
 | **API** | https://api.vegasthisweekend.com |
-| **Admin panel** | http://127.0.0.1:5174 — **runs on your machine only**, see below |
+| **Admin panel** | http://localhost:5174 — **runs on your machine only**, see below |
 | Repo | https://github.com/JLeePGP/VegasThisWeekend |
 | What's shipped and what's next | [BACKLOG.md](BACKLOG.md) |
 | Dashboard steps still to do | [OPERATIONS.md](OPERATIONS.md) |
@@ -25,7 +25,7 @@ live API:
 ```bash
 cd admin
 npm install     # first time only
-npm run dev     # → http://127.0.0.1:5174
+npm run dev     # → http://localhost:5174
 ```
 
 It binds to loopback only, so it is not reachable from your network. `admin/.env` points it
@@ -105,7 +105,7 @@ npm run dev
 The dev server also binds to your LAN, so you can open it on a real phone — which is the
 only honest way to judge a swipe interaction.
 
-### Admin panel — http://127.0.0.1:5174
+### Admin panel — http://localhost:5174
 
 Runs on your machine only; it is never deployed. It talks to whichever API
 `VITE_API_BASE_URL` names — the local backend while you're testing, the Railway origin
@@ -120,6 +120,14 @@ npm run dev
 
 Sign in with the `ADMIN_TOKEN` from `backend/.env`. It is stored in the browser, not in
 a file, so it never lands in the repo.
+
+**Open it at `localhost:5174`, not `127.0.0.1:5174`.** They are the same machine but
+*different origins* to a browser, and only `http://localhost:5174` is in the production
+`CORS_ORIGINS` list. Get this wrong and the panel reports **"Can't reach the API"** while
+the API is up and answering perfectly — a rejected CORS preflight arrives in JavaScript as
+a bare network failure with no status, so the panel cannot tell "blocked" from "down". The
+dev server binds to `localhost` for exactly this reason; if you ever change that in
+`vite.config.js`, add the new origin to `CORS_ORIGINS` on Railway in the same breath.
 
 **To switch on AI extraction**, put your key in `backend/.env`:
 
@@ -146,7 +154,7 @@ in `backend/.env`. Until then events keep the client-side generated posters.
 ### Tests
 
 ```bash
-cd backend && .venv/Scripts/python -m pytest tests -q      # 161 tests
+cd backend && .venv/Scripts/python -m pytest tests -q      # 293 tests
 ```
 
 ### Migrations
