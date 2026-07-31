@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from .. import cache
@@ -18,7 +18,7 @@ from ..enums import DateFilter, PriceTier, Vibe
 from ..limiter import limiter
 from ..models import Event, EventTag
 from ..schemas import EventListOut, EventOut
-from ..timewindow import now_utc, resolve_window
+from ..timewindow import listing_date, now_utc, now_vegas, resolve_window
 from ..tips import load_tip_buckets, match_tip
 
 router = APIRouter(tags=["events"])
@@ -50,6 +50,35 @@ def _allow_edge_cache(response: Response) -> None:
     """
     response.headers["Cache-Control"] = EDGE_CACHE
     response.headers["Vary"] = "Origin"
+
+
+def _lead_event_id(db: Session, conditions) -> str | None:
+    """The event promoted to the top of the feed today, or None to leave order alone.
+
+    The first card is the app's first impression, and a still photo is a weak one in a
+    feed built to look like TikTok — so a card with video leads when there is one.
+
+    Which one rotates by listing day rather than at random. Random would not survive
+    contact with either of the two things around this endpoint: the 60-second shared edge
+    cache means every visitor gets one stored copy anyway, and offset pagination against a
+    reshuffling order would duplicate some cards and skip others on scroll. A value that
+    changes once a day is stable within any page-through and still varies for someone who
+    comes back tomorrow.
+
+    Chosen from the same filtered set the listing itself uses, so the promoted event is
+    always one that belongs in the window the visitor is looking at. Returns None when the
+    window has no video at all, which is the ordinary case for a narrow filter.
+    """
+    ids = db.scalars(
+        select(Event.id)
+        .where(*conditions, Event.video_url.is_not(None), Event.video_url != "")
+        # Ordered before the pick so the rotation is over a stable sequence; an unordered
+        # set would let the database's row order change which event leads.
+        .order_by(Event.start_at.asc(), Event.id.asc())
+    ).all()
+    if not ids:
+        return None
+    return ids[listing_date(now_vegas()).toordinal() % len(ids)]
 
 
 def _serialise(row: Event, buckets) -> EventOut:
@@ -110,12 +139,16 @@ def list_events(
 
     total = db.scalar(select(func.count()).select_from(Event).where(*conditions)) or 0
 
+    # Expressed in the ORDER BY rather than by moving a row after the fact: the promotion
+    # has to be part of one total ordering, or page 2 would serve the promoted event a
+    # second time and drop whatever it displaced.
+    lead_id = _lead_event_id(db, conditions)
+    ordering = [Event.start_at.asc(), Event.id.asc()]
+    if lead_id is not None:
+        ordering.insert(0, case((Event.id == lead_id, 0), else_=1))
+
     rows = db.scalars(
-        select(Event)
-        .where(*conditions)
-        .order_by(Event.start_at.asc(), Event.id.asc())
-        .limit(limit)
-        .offset(offset)
+        select(Event).where(*conditions).order_by(*ordering).limit(limit).offset(offset)
     ).all()
 
     buckets = load_tip_buckets(db)

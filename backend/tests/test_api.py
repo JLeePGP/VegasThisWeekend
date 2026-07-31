@@ -102,6 +102,110 @@ class TestListEvents:
         assert client.get("/events", params={"on": "next friday"}).status_code == 422
 
 
+class TestVideoLeadsTheFeed:
+    """The first card is the app's first impression, so a video leads when one exists.
+
+    The rotation is by listing day rather than random, and the tests below pin the two
+    reasons why: a shared edge cache serves every visitor the same stored copy, and offset
+    pagination against a reshuffling order would duplicate and drop cards on scroll.
+    """
+
+    def names(self, client, **params):
+        query = {"date": "all", **params}
+        return [item["name"] for item in client.get("/events", params=query).json()["items"]]
+
+    def test_a_video_event_leads_even_when_it_starts_later(self, client, db):
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        add_event(db, name="Photo only", start=early)
+        add_event(db, name="Has video", start=early + timedelta(hours=4),
+                  video_url="https://media.vegasthisweekend.com/video/a.mp4")
+        assert self.names(client)[0] == "Has video"
+
+    def test_the_rest_of_the_feed_stays_chronological(self, client, db):
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        add_event(db, name="Second", start=early + timedelta(hours=1))
+        add_event(db, name="Third", start=early + timedelta(hours=2))
+        add_event(db, name="Leads", start=early + timedelta(hours=9),
+                  video_url="https://media.vegasthisweekend.com/video/a.mp4")
+        assert self.names(client) == ["Leads", "Second", "Third"]
+
+    def test_order_is_untouched_when_nothing_has_video(self, client, db):
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        add_event(db, name="Later", start=early + timedelta(hours=4))
+        add_event(db, name="Earlier", start=early)
+        assert self.names(client) == ["Earlier", "Later"]
+
+    def test_an_empty_video_url_does_not_count_as_video(self, client, db):
+        """A blank string is what an emptied form field stores, and it plays nothing."""
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        add_event(db, name="Later blank", start=early + timedelta(hours=4), video_url="")
+        add_event(db, name="Earlier", start=early)
+        assert self.names(client) == ["Earlier", "Later blank"]
+
+    def test_the_lead_comes_from_the_filtered_window_only(self, client, db):
+        """Promoting a video event the visitor's filter excludes would either leak it in
+        or promote nothing — both wrong. The pick runs against the same conditions."""
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        add_event(db, name="Music no video", start=early, vibe="music")
+        add_event(db, name="Show with video", start=early + timedelta(hours=2), vibe="shows",
+                  video_url="https://media.vegasthisweekend.com/video/a.mp4")
+        assert self.names(client, vibe="music") == ["Music no video"]
+
+    def test_paging_never_repeats_or_drops_the_promoted_event(self, client, db):
+        """The promotion lives in the ORDER BY for exactly this reason — moving a row
+        after the query would serve it again on page 2."""
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        for index in range(4):
+            add_event(db, name=f"Event {index}", start=early + timedelta(hours=index))
+        add_event(db, name="Leads", start=early + timedelta(hours=9),
+                  video_url="https://media.vegasthisweekend.com/video/a.mp4")
+
+        seen = []
+        for offset in range(5):
+            page = client.get("/events", params={"date": "all", "limit": 1, "offset": offset})
+            seen += [item["name"] for item in page.json()["items"]]
+        assert seen[0] == "Leads"
+        assert len(seen) == len(set(seen)) == 5
+
+    def test_the_lead_is_stable_within_a_day(self, client, db):
+        """Two requests a second apart must agree, or paging through would reorder."""
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        for index in range(3):
+            add_event(db, name=f"Video {index}", start=early + timedelta(hours=index),
+                      video_url=f"https://media.vegasthisweekend.com/video/{index}.mp4")
+        assert self.names(client)[0] == self.names(client)[0]
+
+    def test_which_video_leads_rotates_with_the_day(self, client, db, monkeypatch):
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        for index in range(2):
+            add_event(db, name=f"Video {index}", start=early + timedelta(hours=index),
+                      video_url=f"https://media.vegasthisweekend.com/video/{index}.mp4")
+
+        def on_day(moment):
+            monkeypatch.setattr("app.routers.events.now_vegas", lambda: moment)
+            return self.names(client)[0]
+
+        noon = datetime.combine(FAR_FUTURE - timedelta(days=7), time(12), tzinfo=VEGAS_TZ)
+        assert on_day(noon) != on_day(noon + timedelta(days=1))
+
+    def test_the_rollover_decides_the_day_not_midnight(self, client, db, monkeypatch):
+        """4am belongs to the night before, so the lead must not change under someone
+        still scrolling at closing time."""
+        early = datetime.combine(FAR_FUTURE, time(18), tzinfo=VEGAS_TZ)
+        for index in range(2):
+            add_event(db, name=f"Video {index}", start=early + timedelta(hours=index),
+                      video_url=f"https://media.vegasthisweekend.com/video/{index}.mp4")
+
+        def at(moment):
+            monkeypatch.setattr("app.routers.events.now_vegas", lambda: moment)
+            return self.names(client)[0]
+
+        day = FAR_FUTURE - timedelta(days=7)
+        before_midnight = datetime.combine(day, time(23), tzinfo=VEGAS_TZ)
+        after_midnight = datetime.combine(day + timedelta(days=1), time(4), tzinfo=VEGAS_TZ)
+        assert at(before_midnight) == at(after_midnight)
+
+
 class TestPagination:
     def test_caps_the_page_size(self, client):
         assert client.get("/events", params={"limit": 21}).status_code == 422
