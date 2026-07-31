@@ -24,6 +24,12 @@ boto3>=1.40,<2.0
 # because images.py imports it in its own right.
 httpx>=0.28,<1.0
 
+# Resolving TikTok share links to the MP4 behind them, so a pasted post URL can be
+# mirrored like any direct file. Imported lazily in video_sources.py. Pinned loosely on
+# purpose: extractors break when the platform changes its page, so this is a dependency
+# that wants upgrading rather than freezing.
+yt-dlp>=2025.9.5
+
 # Postgres driver for Railway. Local dev falls back to SQLite and does not need it,
 # so install with `pip install -r requirements.txt` on Linux/prod and
 # `pip install -r requirements-dev.txt` locally if a wheel is unavailable.

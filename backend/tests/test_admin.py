@@ -127,6 +127,25 @@ class TestCreateEvent:
         body = admin_client.post("/admin/events", json=payload).json()
         assert "video" in body["media_warning"]
 
+    def test_a_tiktok_url_is_not_resolved_while_r2_is_off(self, admin_client, monkeypatch):
+        """Resolving must sit *behind* the R2 gate, not in front of it.
+
+        A resolved TikTok URL is signed and expires within hours, so producing one when
+        there is no bucket to copy it into would store a link that plays this afternoon
+        and goes blank tonight — far harder to diagnose than one that never worked.
+        """
+
+        def explode(url):
+            raise AssertionError("a download was attempted with R2 unconfigured")
+
+        monkeypatch.setattr("app.routers.admin.download_video_page", explode)
+        payload = event_payload(
+            video_url="https://www.tiktok.com/@lvlightsfc/video/7665394552613735711",
+            mirror_video=True,
+        )
+        body = admin_client.post("/admin/events", json=payload).json()
+        assert "R2" in body["media_warning"]
+
     def test_both_failures_are_reported_not_just_the_first(self, admin_client):
         """One field carries both messages, so a video failure cannot be swallowed by an
         image failure happening first."""

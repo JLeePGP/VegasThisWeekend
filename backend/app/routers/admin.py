@@ -32,8 +32,13 @@ from ..bulk_extraction import (
 from ..client_ip import client_ip, resolve as resolve_client_sources
 from ..duplicates import find_possible_duplicates
 from ..extraction import ExtractionError, extract_event, parse_local
-from ..images import ImageMirrorError, mirror_to_r2
+from ..images import ImageMirrorError, mirror_bytes_to_r2, mirror_to_r2
 from ..limiter import limiter
+from ..video_sources import (
+    VideoResolveError,
+    download_video_page,
+    is_resolvable_video_page,
+)
 from ..models import Event, EventTag, ExtractionDraft, InsiderTip
 from ..proxy_guard import secret_status
 from ..recurrence import expand_occurrences
@@ -212,6 +217,20 @@ def _mirror_or_keep(
         return url, False, None
     if not settings.r2_enabled:
         return url, False, f"R2 is not configured, so the {kind} was not mirrored."
+
+    # A TikTok link is a page, not a file. yt-dlp fetches the video behind it, so pasting
+    # a share link works the same as pasting a direct URL.
+    #
+    # This runs only past the r2_enabled gate above, and that ordering is load-bearing:
+    # downloading a video we have nowhere to put would be pure waste, and the URL we would
+    # be left storing still could not play.
+    if kind == "video" and is_resolvable_video_page(url):
+        try:
+            body, content_type = download_video_page(url)
+            return mirror_bytes_to_r2(body, content_type, kind=kind), True, None
+        except (VideoResolveError, ImageMirrorError) as error:
+            return url, False, str(error)
+
     try:
         return mirror_to_r2(url, kind=kind), True, None
     except ImageMirrorError as error:

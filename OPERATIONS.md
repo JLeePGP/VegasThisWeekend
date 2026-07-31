@@ -76,6 +76,32 @@ usual bill-killer. At this scale — a few hundred images and a handful of short
 expect the free tier (10 GB storage, 1M writes/month, 10M reads/month) to cover it
 entirely.
 
+### TikTok links in the video field
+
+Paste the post URL. `app/video_sources.py` hands it to yt-dlp, which downloads the MP4,
+and that goes into R2 like any other video. Nothing to configure — but two things to know.
+
+**Only TikTok.** `RESOLVABLE_HOSTS` is the allowlist, and it is a security boundary, not
+a convenience: yt-dlp ships ~2000 extractors and this path runs outside the per-hop SSRF
+checks in `images.py`. Instagram is deliberately excluded — its posts need a logged-in
+session, so supporting it would put a credential on the server. Instagram images stay a
+manual job.
+
+**It will break eventually, and the fix is a version bump.** Extractors break when the
+platform reshapes its pages. The symptom is a media warning in the panel reading "Could
+not read that TikTok post: …". The fix is almost always:
+
+```
+pip install -U yt-dlp     # then commit the new floor in requirements.txt and redeploy
+```
+
+This is why `yt-dlp` is pinned with a floor rather than an exact version — it is a
+dependency that wants upgrading, not freezing.
+
+**Direct URLs are unaffected.** Anything that is not on the allowlist takes the ordinary
+path: fetched by `images.py` with the full redirect and address checking. Adding a `.mp4`
+URL behaves exactly as it did before.
+
 ---
 
 ## 2. Turn off Cloudflare Web Analytics

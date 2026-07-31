@@ -17,6 +17,7 @@ from app.images import (
     VIDEO_CONTENT_TYPES,
     ImageMirrorError,
     download_media,
+    mirror_bytes_to_r2,
 )
 
 
@@ -107,6 +108,37 @@ class TestSizeCaps:
 
         settings = get_settings()
         assert settings.max_video_bytes > settings.max_image_bytes
+
+
+class TestPreFetchedBytes:
+    """`mirror_bytes_to_r2` is the entry point for media yt-dlp fetched itself, so it
+    never passed through `download_media`'s allowlist. It has to re-check, or the one
+    guard standing between a card and a stored HTML error page is skipped entirely."""
+
+    def test_an_unsupported_type_is_refused(self):
+        with pytest.raises(ImageMirrorError, match="Unsupported video type"):
+            mirror_bytes_to_r2(b"<!doctype html>", "text/html", kind="video")
+
+    def test_an_image_type_is_refused_as_video(self):
+        with pytest.raises(ImageMirrorError, match="Unsupported video type"):
+            mirror_bytes_to_r2(b"\xff\xd8\xff", "image/jpeg", kind="video")
+
+    def test_an_empty_body_is_refused(self):
+        with pytest.raises(ImageMirrorError, match="empty"):
+            mirror_bytes_to_r2(b"", "video/mp4", kind="video")
+
+    def test_an_oversized_body_is_refused(self, monkeypatch):
+        from app.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "max_video_bytes", 8, raising=False)
+        with pytest.raises(ImageMirrorError, match="larger than the size limit"):
+            mirror_bytes_to_r2(b"x" * 100, "video/mp4", kind="video")
+
+    def test_valid_bytes_still_need_r2(self):
+        """Conftest blanks the R2 vars, so this is the unconfigured path — and it proves
+        validation happens before the config gate rather than instead of it."""
+        with pytest.raises(ImageMirrorError, match="not configured"):
+            mirror_bytes_to_r2(b"\x00\x00\x00\x18ftypmp42", "video/mp4", kind="video")
 
 
 class TestFailureModes:

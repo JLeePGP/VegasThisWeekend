@@ -162,11 +162,33 @@ def download_image(source_url: str) -> tuple[bytes, str]:
 
 def mirror_to_r2(source_url: str, *, kind: str = "image") -> str:
     """Copy media into R2 and return its durable public URL."""
+    body, content_type = download_media(source_url, kind=kind)
+    return mirror_bytes_to_r2(body, content_type, kind=kind)
+
+
+def mirror_bytes_to_r2(body: bytes, content_type: str, *, kind: str = "image") -> str:
+    """Upload already-fetched media into R2 and return its durable public URL.
+
+    Split out because TikTok's CDN will not serve its own signed URLs to a plain client —
+    yt-dlp fetches those bytes itself (see `video_sources`), so that path arrives here
+    with the download already done. The content type is re-checked rather than trusted:
+    this is a public entry point now, and the allowlist is the thing standing between a
+    card and an HTML error page stored as a video.
+    """
+    # Validated before the R2 gate on purpose: "this is not a video" is true whether or
+    # not a bucket exists, and checking it first means the refusal can be tested without
+    # standing up credentials.
+    allowed, max_bytes, _ = _rules_for(kind)
+    if content_type not in allowed:
+        raise ImageMirrorError(f"Unsupported {kind} type: {content_type or 'unknown'}")
+    if not body:
+        raise ImageMirrorError(f"That {kind} was empty.")
+    if len(body) > max_bytes:
+        raise ImageMirrorError(f"That {kind} is larger than the size limit.")
+
     settings = get_settings()
     if not settings.r2_enabled:
         raise ImageMirrorError("Cloudflare R2 is not configured on this deployment.")
-
-    body, content_type = download_media(source_url, kind=kind)
 
     # Imported lazily: the API runs fine without boto3 when R2 is unconfigured.
     import boto3
