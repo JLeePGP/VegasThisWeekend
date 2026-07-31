@@ -58,18 +58,23 @@ event's `image_url` should now start with `https://media.vegasthisweekend.com/ev
 If it still points at the original host, the panel shows a warning saying why — read it.
 Video mirrors the same way, into `/video/` instead of `/events/`.
 
-**Then tighten the CSP.** Once media is mirroring, edit
-[frontend/public/\_headers](frontend/public/_headers) and narrow these two:
+**The CSP is now tightened — done 31 Jul 2026.**
+[frontend/public/\_headers](frontend/public/_headers) names the R2 domain and nothing else:
 
 ```
 img-src 'self' data: https://media.vegasthisweekend.com;
 media-src 'self' https://media.vegasthisweekend.com;
 ```
 
-They currently allow any `https:` host, which is what makes an unmirrored URL work at
-all. After tightening, an unmirrored image silently fails to load and falls back to the
-generated poster — which is the correct behaviour, but do it only after confirming
-mirroring works, or every card goes blank at once.
+They previously allowed any `https:` host, which is what made an unmirrored URL work at
+all. Now an unmirrored image fails to load and falls back to the generated poster, which
+is the correct outcome — but it does mean **an event whose media did not mirror shows a
+generated poster rather than its picture**, silently. The admin panel's media warning is
+the place that tells you why; the live site will not.
+
+Before adding media from a new source, it is worth knowing this changes the failure mode
+from "works, leaks the visitor's IP" to "does not appear". That is the trade this whole
+section exists to make.
 
 **Cost.** R2 charges for storage and operations but **not for egress**, which is the
 usual bill-killer. At this scale — a few hundred images and a handful of short videos —
