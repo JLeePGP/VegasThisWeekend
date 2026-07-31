@@ -102,6 +102,12 @@ changes go together and neither alone is enough:
 - Toggle off but CSP entries left in → nothing breaks, but the policy still advertises a
   third-party host we don't use.
 
+**Current state, measured 30 Jul 2026.** The deployed CSP is now `script-src 'self'` with
+nothing else, and the served HTML contains exactly one script tag — the app bundle. So
+the beacon is not being injected right now. Treat the dashboard step as confirming that
+rather than changing it, and check the toggle anyway: whether it is on is not something
+the page can tell you reliably, and it can be turned on later by accident.
+
 **How to tell it worked.** Load https://vegasthisweekend.com with DevTools open. The
 Network tab should show no request to any `cloudflareinsights.com` host, and the Console
 should show no CSP violation. Cloudflare's own traffic analytics (the zone-level one) is
@@ -137,10 +143,31 @@ is one person's saved list and `/admin/*` is behind a bearer token; caching eith
 mean the edge serving one person's response to somebody else. The path condition is the
 only thing preventing that, so don't loosen it to `/`.
 
-**How to tell it worked.** `curl -sI https://api.vegasthisweekend.com/events | grep -i
-cf-cache-status`. First request says `MISS`, the second within a minute says `HIT`. Then
-check the negative case: `curl -sI https://api.vegasthisweekend.com/admin/events` must
-never say `HIT`.
+**How to tell it worked.**
+
+```bash
+curl -s -D - -o /dev/null "https://api.vegasthisweekend.com/events?date=all" | grep -i cf-cache-status
+```
+
+First request says `MISS`, the second within a minute says `HIT`. Before the rule exists
+it says `DYNAMIC`, which is how you know the rule is the missing piece rather than the
+headers.
+
+Use `-D - -o /dev/null` rather than `curl -I`. `-I` sends a HEAD request and FastAPI
+answers those with 405, so you get a status line that tells you nothing about caching.
+
+Then check the negative case — this is the one that actually matters:
+
+```bash
+curl -s -D - -o /dev/null https://api.vegasthisweekend.com/admin/events | grep -i cf-cache-status
+```
+
+It must never say `HIT`.
+
+**Already verified from the origin side** (30 Jul 2026, against production): `/events`
+and `/events/{id}` send the caching header; `/share/{token}`, `/admin/events` and
+`/health` send no `Cache-Control` at all. So the only thing standing between here and a
+working edge cache is the rule itself.
 
 ---
 
@@ -188,14 +215,29 @@ already had.
 If both hold, set `REQUIRE_PROXY_SECRET=true` in Railway. Anything without the secret now
 gets a 403.
 
+The diagnostics response looks like this (measured against production, 30 Jul 2026,
+before the secret was set):
+
+```json
+"proxy_secret": {
+  "secret_configured": false,
+  "secret_present_on_this_request": false,
+  "secret_matches": false,
+  "requirement_enforced": false
+}
+```
+
+After stage 1, `secret_configured` and `secret_matches` should both read true through the
+custom domain.
+
 **Two things that will bite.**
 
 - `/health` is exempt, deliberately. Railway's healthcheck hits the container directly,
   never through Cloudflare — without the exemption every deploy would fail its
   healthcheck and roll back while the logs showed a perfectly healthy app.
-- **The admin panel currently points at the raw Railway hostname** (see `admin/.env`).
-  Enforcement will 403 it. Change `VITE_API_BASE_URL` to
-  `https://api.vegasthisweekend.com` first.
+- The admin panel used to point at the raw Railway hostname, which enforcement would have
+  403'd. `admin/.env` now points at `https://api.vegasthisweekend.com`. If you ever point
+  it back for testing, enforcement will lock the panel out.
 
 **Rollback.** Delete `REQUIRE_PROXY_SECRET` (or set it false) in Railway. Takes effect on
 the next boot.
