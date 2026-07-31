@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from .. import cache
 from ..config import get_settings
 from ..db import get_db
 from ..enums import DateFilter, PriceTier, Vibe
@@ -24,6 +25,33 @@ router = APIRouter(tags=["events"])
 settings = get_settings()
 
 
+# How long a shared cache may serve a listing without asking again.
+#
+# The catalog changes when John adds an event, which is a handful of times a week — not
+# per second. A minute of staleness is invisible to a visitor and is the difference
+# between every visitor reaching Postgres and roughly one request per distinct filter
+# combination per minute doing so.
+#
+# `max-age=0` keeps browsers revalidating, so a person who adds a filter sees fresh data;
+# `s-maxage` applies only to shared caches like Cloudflare. `stale-while-revalidate` lets
+# the edge serve the old copy while it fetches a new one, so nobody waits on the origin.
+EDGE_CACHE = "public, max-age=0, s-maxage=60, stale-while-revalidate=120"
+
+
+def _allow_edge_cache(response: Response) -> None:
+    """Mark a response cacheable by shared caches.
+
+    Only ever applied to endpoints whose body is identical for every visitor. Nothing
+    behind auth and nothing keyed to a person goes through here — a single mistake would
+    mean one visitor's response served to another.
+
+    `Vary: Origin` because CORS puts the requesting origin in the response headers, and
+    an edge that ignored that could hand a response built for one origin to another.
+    """
+    response.headers["Cache-Control"] = EDGE_CACHE
+    response.headers["Vary"] = "Origin"
+
+
 def _serialise(row: Event, buckets) -> EventOut:
     payload = EventOut.model_validate(row)
     payload.insider_tip = match_tip(row, buckets)
@@ -34,6 +62,7 @@ def _serialise(row: Event, buckets) -> EventOut:
 @limiter.limit("100/minute")
 def list_events(
     request: Request,
+    response: Response,
     date_filter: DateFilter = Query(DateFilter.WEEKEND, alias="date"),
     on: date | None = Query(None, description="A specific Vegas date (YYYY-MM-DD)."),
     vibe: list[Vibe] | None = Query(None, description="Repeatable; any match."),
@@ -90,15 +119,21 @@ def list_events(
     ).all()
 
     buckets = load_tip_buckets(db)
-    has_sample = bool(
-        db.scalar(
-            select(func.count())
-            .select_from(Event)
-            .where(Event.is_sample.is_(True), Event.is_active.is_(True))
-        )
+
+    # Cached: this decides whether a banner shows, and it was a COUNT over the whole
+    # table on every single list request. It changes only when John edits an event.
+    has_sample = cache.get_or_set(
+        cache.SAMPLE_DATA,
+        lambda: bool(
+            db.scalar(
+                select(func.count())
+                .select_from(Event)
+                .where(Event.is_sample.is_(True), Event.is_active.is_(True))
+            )
+        ),
     )
 
-    return EventListOut(
+    payload = EventListOut(
         items=[_serialise(row, buckets) for row in rows],
         total=total,
         limit=limit,
@@ -106,16 +141,21 @@ def list_events(
         has_more=offset + len(rows) < total,
         sample_data=has_sample,
     )
+    _allow_edge_cache(response)
+    return payload
 
 
 @router.get("/events/{event_id}", response_model=EventOut)
 @limiter.limit("100/minute")
 def get_event(
     request: Request,
+    response: Response,
     event_id: str = Path(pattern=r"^[0-9a-f]{32}$"),
     db: Session = Depends(get_db),
 ) -> EventOut:
     row = db.get(Event, event_id)
     if row is None or not row.is_active:
         raise HTTPException(status_code=404, detail="Event not found.")
-    return _serialise(row, load_tip_buckets(db))
+    payload = _serialise(row, load_tip_buckets(db))
+    _allow_edge_cache(response)
+    return payload

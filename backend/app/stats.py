@@ -43,43 +43,62 @@ def _insert_for(session: Session):
 def record(session: Session, counts: Counter[tuple[Metric, str | None]]) -> int:
     """Add a batch of interactions to today's counters.
 
-    Takes a Counter keyed by (metric, event_id) so a burst of twenty swipes becomes a
-    handful of statements rather than twenty. Returns the number of counters touched.
+    Takes a Counter keyed by (metric, event_id) and writes the whole batch in at most two
+    statements. Returns the number of counters touched.
+
+    Two rather than one because a per-event counter and a site-wide counter resolve their
+    conflicts against two different partial unique indexes — see StatCounter — and a
+    single INSERT can only name one. So the rows are split by that and each group goes in
+    as one multi-row upsert.
+
+    This matters at load: a visitor working through a stack sends a batch every few
+    seconds, and the old shape put a round trip on the wire for every distinct
+    (metric, event) pair in it. Twenty swipes across ten events was twenty statements
+    inside one transaction; it is now two.
     """
     if not counts:
         return 0
 
-    insert = _insert_for(session)
     day = vegas_today()
 
+    per_event: list[dict] = []
+    site_wide: list[dict] = []
     for (metric, event_id), amount in counts.items():
         if amount <= 0:
             continue
+        row = {"day": day, "metric": metric.value, "event_id": event_id, "count": amount}
+        (per_event if event_id else site_wide).append(row)
 
-        statement = insert(StatCounter).values(
-            day=day,
-            metric=metric.value,
-            event_id=event_id,
-            count=amount,
-        )
-        # The index the conflict resolves against depends on whether this is a per-event
-        # or a site-wide counter, because they are enforced by two different partial
-        # unique indexes — see StatCounter.
-        index_elements = ["day", "metric", "event_id"] if event_id else ["day", "metric"]
-        index_where = (
-            StatCounter.event_id.is_not(None) if event_id else StatCounter.event_id.is_(None)
-        )
+    if not per_event and not site_wide:
+        return 0
+
+    insert = _insert_for(session)
+
+    groups = (
+        (per_event, ["day", "metric", "event_id"], StatCounter.event_id.is_not(None)),
+        (site_wide, ["day", "metric"], StatCounter.event_id.is_(None)),
+    )
+    for rows, index_elements, index_where in groups:
+        if not rows:
+            continue
+        statement = insert(StatCounter).values(rows)
         session.execute(
             statement.on_conflict_do_update(
                 index_elements=index_elements,
                 index_where=index_where,
-                # Add to whatever is already there rather than overwriting it.
-                set_={"count": StatCounter.count + amount},
+                # `excluded` is the row this statement proposed, so each row in the batch
+                # adds its own amount. A literal would apply one row's amount to all of
+                # them — the reason this cannot simply be `count + amount` any more.
+                #
+                # Safe against a row conflicting with itself only because the input is a
+                # Counter: every (metric, event_id) appears once, and Postgres rejects a
+                # statement that tries to update the same row twice.
+                set_={"count": StatCounter.count + statement.excluded.count},
             )
         )
 
     session.commit()
-    return len(counts)
+    return len(per_event) + len(site_wide)
 
 
 def summary(session: Session, days: int = 30) -> dict:

@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     max_series_occurrences: int = 26
     # Refuse to mirror anything larger; a hostile page can advertise a huge image.
     max_image_bytes: int = 10_000_000
+    # Video gets its own, larger ceiling. A card's clip is a few seconds of vertical
+    # phone footage, so 60MB is generous; anything past that is not what this is for and
+    # would cost more to serve than the event is worth.
+    max_video_bytes: int = 60_000_000
 
     share_ttl_days: int = 30
     max_share_events: int = 20
@@ -57,6 +61,19 @@ class Settings(BaseSettings):
     # and without it every visitor shares one rate-limit bucket. See client_ip.py for
     # what trusting them costs, and turn it off if the API is ever exposed directly.
     trust_proxy_headers: bool = True
+
+    # A secret injected by a Cloudflare Transform Rule and required here, so the origin
+    # can tell a request that really came through Cloudflare from one that went straight
+    # to the raw *.up.railway.app hostname. Empty disables the check entirely.
+    proxy_shared_secret: str = ""
+    # Two-stage on purpose. With the secret set but this off, the header is *believed*
+    # only when the secret matches, and requests without it are still served — which is
+    # what makes it safe to deploy before the Cloudflare rule exists. Turning this on
+    # then refuses anything that did not come through Cloudflare.
+    #
+    # Do not turn this on while the admin panel points at the raw Railway hostname: its
+    # requests do not pass through Cloudflare and would start getting 403s.
+    require_proxy_secret: bool = False
 
     @property
     def sqlalchemy_url(self) -> str:

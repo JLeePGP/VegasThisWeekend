@@ -42,9 +42,10 @@ the certainty that everybody currently shares one bucket, trusting the header is
 better failure mode — but it is a trade, not a fix, and `TRUST_PROXY_HEADERS` exists so
 it can be turned off.
 
-Closing it properly means making the origin unreachable except through Cloudflare:
-either an IP allowlist on Railway, or a secret header injected by a Cloudflare Transform
-Rule and required here. Both need dashboard access this code does not have.
+This is now closed, when configured: proxy_guard.py checks a secret that only Cloudflare
+knows, and a request that does not carry it has its forwarding headers ignored and is
+keyed on its socket peer instead. Until `PROXY_SHARED_SECRET` is set and the matching
+Cloudflare Transform Rule exists, the trade above is still what is in force.
 """
 
 from __future__ import annotations
@@ -53,6 +54,7 @@ from fastapi import Request
 from slowapi.util import get_remote_address
 
 from .config import get_settings
+from .proxy_guard import came_through_proxy
 
 
 def resolve(request: Request) -> dict[str, str | None]:
@@ -76,6 +78,13 @@ def resolve(request: Request) -> dict[str, str | None]:
 def client_ip(request: Request) -> str:
     """The rate-limit bucket key."""
     if not get_settings().trust_proxy_headers:
+        return get_remote_address(request) or "unknown"
+
+    # A request that did not come through Cloudflare has forwarding headers that mean
+    # nothing — anyone hitting the raw Railway hostname sets them to whatever they like.
+    # Keying on the socket peer instead means such a request can only affect its own
+    # bucket, not somebody else's.
+    if not came_through_proxy(request):
         return get_remote_address(request) or "unknown"
 
     sources = resolve(request)

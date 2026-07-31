@@ -67,8 +67,10 @@ class EventWriteIn(BaseModel):
     source_url: str | None = Field(default=None, max_length=500)
     is_active: bool = True
 
-    # Copy image_url into R2 on save so the card survives the venue's next redesign.
+    # Copy media into R2 on save so the card survives the venue's next redesign — and
+    # so a visitor's browser never requests anything from a host we do not control.
     mirror_image: bool = True
+    mirror_video: bool = True
     # Only honoured on create; a series is generated once, then edited per night.
     recurrence: RecurrenceIn | None = None
 

@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from .config import get_settings
 from .limiter import limiter
+from .proxy_guard import came_through_proxy
 from .routers import admin, events, interactions, share
 
 settings = get_settings()
@@ -38,6 +40,35 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Paths that must stay reachable without going through Cloudflare. Railway's own
+# healthcheck hits the container directly, so requiring the secret everywhere would make
+# every deploy fail its healthcheck and roll back — with the logs showing a healthy app.
+PROXY_EXEMPT_PATHS = {"/health"}
+
+
+# Registered before the CORS middleware below, which means CORS ends up *outside* it:
+# Starlette wraps the last-added middleware outermost. That ordering matters — a 403 from
+# here still gets CORS headers, so a browser shows the real status instead of an opaque
+# CORS failure that looks like an entirely different problem.
+@app.middleware("http")
+async def require_proxy(request: Request, call_next):
+    """Refuse requests that did not come through Cloudflare, once that is switched on.
+
+    Off by default and inert until both `PROXY_SHARED_SECRET` is set and
+    `REQUIRE_PROXY_SECRET` is true — see proxy_guard.py for why enabling it is a
+    deliberate second step rather than a consequence of setting the secret.
+    """
+    if (
+        settings.require_proxy_secret
+        and request.url.path not in PROXY_EXEMPT_PATHS
+        and not came_through_proxy(request)
+    ):
+        # Deliberately says nothing about what is missing or expected. Someone probing
+        # the raw origin learns only that it declined.
+        return JSONResponse(status_code=403, content={"detail": "Forbidden."})
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,

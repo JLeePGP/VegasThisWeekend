@@ -28,6 +28,25 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 | C10 | Extraction `effort` measured — see the note in `extraction.py` | `5b83047` |
 | C5 | **Rate limiting keyed on the real visitor**, not the proxy | `c40f2ff` |
 
+### Privacy & scale pass — 30 Jul 2026
+
+Built against one requirement: the experience should be the same for one visitor or a
+hundred thousand, and no visitor should be identifiable to us or to anyone else.
+
+| Item | What changed | Why it mattered |
+|---|---|---|
+| Edge caching | `/events` and `/events/{id}` send `s-maxage=60, stale-while-revalidate=120`; nothing else does | Without it, a thousand concurrent visitors is a thousand identical Postgres queries |
+| Query reduction | Sample-data COUNT and the tip table are cached in-process for 30s, invalidated on every admin write | Four DB round trips per listing became two |
+| Batched counters | Interaction upserts go in as at most two multi-row statements | Twenty swipes across ten events was twenty INSERTs; it's now two, at any batch size |
+| Cloudflare beacon | Removed from the CSP entirely — `script-src` is now bare `'self'` | Edge-injected, so it never appeared in the repo. Third-party script on every page, telling us what our own counters already do |
+| R2 for video | Mirroring generalised from images to video, own size cap and timeout | Every off-origin URL hands that host the visitor's IP and referring page. Mirroring means the browser talks to our bucket and nobody else |
+| Proxy hardening | Shared secret from a Cloudflare Transform Rule; unverified requests get keyed on their socket peer, and can be refused outright | `CF-Connecting-IP` was forgeable via the raw Railway hostname — enough to exhaust *another* visitor's rate limit |
+| Backup verification | `backend/scripts/verify_backup.py` — dump, restore to scratch, compare row counts, drop | An untested backup is a guess, and there are hand-entered events in production now |
+
+**All of it needs dashboard work to take effect** — R2 credentials, the cache rule, the
+Transform Rule, the analytics toggle, the backup schedule. Every step, and the check that
+proves each one actually worked, is in [OPERATIONS.md](OPERATIONS.md).
+
 **C5 was a live bug, now confirmed rather than suspected.** The deployed API reported its
 socket peer as `100.64.0.2` — RFC 6598 shared space, Railway's internal proxy — so every
 visitor on earth shared one bucket and the 100/min public limits were 100/min *in total*.

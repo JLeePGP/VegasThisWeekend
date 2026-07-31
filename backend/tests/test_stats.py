@@ -69,6 +69,72 @@ class TestRecording:
         post(client, [{"metric": "share_create"}])
         assert db.query(StatCounter).one().day == vegas_today()
 
+    def test_differing_amounts_in_one_batch_update_their_own_rows(self, client, db):
+        """The failure mode of writing the batch as a single multi-row upsert.
+
+        The statement adds `excluded.count` — the amount each row proposed. If it added a
+        literal instead, every row in the batch would get the same increment, and the bug
+        would only appear once the rows already existed: the first batch inserts, so it
+        looks correct, and the second silently gives both events the same number.
+        """
+        one = add_event(db, name="One")
+        two = add_event(db, name="Two")
+        post(client, [{"metric": "save", "event_id": one.id}])
+        post(client, [{"metric": "save", "event_id": two.id}])
+
+        post(
+            client,
+            [{"metric": "save", "event_id": one.id}] * 2
+            + [{"metric": "save", "event_id": two.id}] * 5,
+        )
+
+        counts = {row.event_id: row.count for row in db.query(StatCounter).all()}
+        assert counts == {one.id: 3, two.id: 6}
+
+    def test_a_batch_mixing_per_event_and_site_wide_records_both(self, client, db):
+        """The two kinds resolve against different partial indexes, so they go in as two
+        separate statements. A batch containing both must not lose either."""
+        event = add_event(db)
+        post(
+            client,
+            [
+                {"metric": "save", "event_id": event.id},
+                {"metric": "share_create"},
+                {"metric": "save", "event_id": event.id},
+            ],
+        )
+        rows = {(r.metric, r.event_id): r.count for r in db.query(StatCounter).all()}
+        assert rows == {("save", event.id): 2, ("share_create", None): 1}
+
+    def test_a_batch_costs_a_fixed_number_of_statements(self, client, db):
+        """The point of the batching. Twenty swipes across ten events used to be twenty
+        INSERTs; it is now two regardless of batch size — one for the per-event rows and
+        one for the site-wide row, because those resolve against different indexes."""
+        from sqlalchemy import event as sa_event
+
+        from app.db import engine
+
+        events = [add_event(db, name=f"Event {n}") for n in range(10)]
+        statements: list[str] = []
+
+        def capture(conn, cursor, statement, parameters, context, executemany):
+            if "stat_counters" in statement.lower():
+                statements.append(statement)
+
+        sa_event.listen(engine, "before_cursor_execute", capture)
+        try:
+            post(
+                client,
+                [{"metric": "save", "event_id": e.id} for e in events]
+                + [{"metric": "skip", "event_id": e.id} for e in events]
+                + [{"metric": "share_create"}],
+            )
+        finally:
+            sa_event.remove(engine, "before_cursor_execute", capture)
+
+        inserts = [s for s in statements if s.lstrip().upper().startswith("INSERT")]
+        assert len(inserts) == 2
+
 
 class TestRejection:
     def test_unknown_metric_is_rejected(self, client):

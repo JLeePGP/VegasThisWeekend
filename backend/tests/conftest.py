@@ -36,6 +36,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import delete  # noqa: E402
 
+from app import cache  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.limiter import limiter  # noqa: E402
 from app.main import app  # noqa: E402
@@ -62,6 +63,10 @@ def clean_database():
         for model in (EventTag, StatCounter, ExtractionDraft, Event, InsiderTip, ShareList):
             session.execute(delete(model))
         session.commit()
+    # The read cache lives in the process, not the database, so truncating tables leaves
+    # it holding the previous test's tips and sample-data flag. Without this, tests pass
+    # or fail depending on what ran before them.
+    cache.invalidate()
     yield
 
 

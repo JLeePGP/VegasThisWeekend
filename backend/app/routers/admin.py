@@ -22,14 +22,20 @@ from sqlalchemy.orm import Session
 from ..auth import require_admin
 from ..config import get_settings
 from ..db import get_db
-from ..bulk_extraction import BulkExtractionError, collect as collect_batches
+from .. import cache
+from ..bulk_extraction import (
+    BulkExtractionError,
+    collect as collect_batches,
+    parse_urls,
+    submit as submit_batch,
+)
 from ..client_ip import client_ip, resolve as resolve_client_sources
-from ..bulk_extraction import parse_urls, submit as submit_batch
 from ..duplicates import find_possible_duplicates
 from ..extraction import ExtractionError, extract_event, parse_local
 from ..images import ImageMirrorError, mirror_to_r2
 from ..limiter import limiter
 from ..models import Event, EventTag, ExtractionDraft, InsiderTip
+from ..proxy_guard import secret_status
 from ..recurrence import expand_occurrences
 from ..stats import summary
 from ..schemas_admin import (
@@ -180,20 +186,48 @@ def get_event(
     return AdminEventOut.from_event(row)
 
 
-def _resolve_image(payload: EventWriteIn) -> tuple[str | None, bool, str | None]:
-    """Mirror the image to R2 if asked and configured. Never fatal.
+def _mirror_or_keep(
+    url: str | None, *, wanted: bool, kind: str
+) -> tuple[str | None, bool, str | None]:
+    """Mirror media to R2 if asked and configured. Never fatal.
 
-    A failed mirror keeps the original URL — an image that works today beats no image —
-    and warns. The client falls back to a generated poster if that URL later breaks.
+    A failed mirror keeps the original URL — media that works today beats none — and
+    warns. The client falls back to a generated poster if that URL later breaks.
+
+    Worth being clear about what a failure costs beyond a broken card: an unmirrored URL
+    means every visitor's browser fetches from that third-party host, handing it their IP
+    and the page they were on. So the warning is not cosmetic, and the honest fix for a
+    URL that will not mirror is usually to drop it rather than to ship it as-is.
     """
-    if not payload.image_url or not payload.mirror_image:
-        return payload.image_url, False, None
+    if not url or not wanted:
+        return url, False, None
     if not settings.r2_enabled:
-        return payload.image_url, False, "R2 is not configured, so the image was not mirrored."
+        return url, False, f"R2 is not configured, so the {kind} was not mirrored."
     try:
-        return mirror_to_r2(payload.image_url), True, None
+        return mirror_to_r2(url, kind=kind), True, None
     except ImageMirrorError as error:
-        return payload.image_url, False, str(error)
+        return url, False, str(error)
+
+
+def _resolve_media(payload: EventWriteIn) -> tuple[str | None, str | None, bool, str | None]:
+    """Resolve both media URLs. Returns (image_url, video_url, mirrored, warning).
+
+    `mirrored` and the warning stay single-valued because that is what the admin UI
+    shows; when both fail, the two messages are joined rather than one being dropped.
+    """
+    image_url, image_mirrored, image_warning = _mirror_or_keep(
+        payload.image_url, wanted=payload.mirror_image, kind="image"
+    )
+    video_url, video_mirrored, video_warning = _mirror_or_keep(
+        payload.video_url, wanted=payload.mirror_video, kind="video"
+    )
+    warnings = [w for w in (image_warning, video_warning) if w]
+    return (
+        image_url,
+        video_url,
+        image_mirrored or video_mirrored,
+        " ".join(warnings) or None,
+    )
 
 
 def _tag_rows(payload: EventWriteIn) -> list[EventTag]:
@@ -252,7 +286,7 @@ def create_events(
                 },
             )
 
-    image_url, mirrored, warning = _resolve_image(payload)
+    image_url, video_url, mirrored, warning = _resolve_media(payload)
 
     created = [
         Event(
@@ -270,7 +304,7 @@ def create_events(
             hook=payload.hook,
             description=payload.description,
             image_url=image_url,
-            video_url=payload.video_url,
+            video_url=video_url,
             ticket_url=payload.ticket_url,
             source_url=payload.source_url,
             is_active=payload.is_active,
@@ -280,6 +314,8 @@ def create_events(
     ]
     db.add_all(created)
     db.commit()
+    # Clears the sample-data banner flag and the tips the public list serves.
+    cache.invalidate()
 
     return EventWriteOut(
         created=[AdminEventOut.from_event(event) for event in created],
@@ -305,7 +341,7 @@ def replace_event(
             detail="A series is generated once on create; edit each night individually.",
         )
 
-    image_url, _, _ = _resolve_image(payload)
+    image_url, video_url, _, _ = _resolve_media(payload)
 
     row.name = payload.name
     row.venue = payload.venue
@@ -323,7 +359,7 @@ def replace_event(
     row.hook = payload.hook
     row.description = payload.description
     row.image_url = image_url
-    row.video_url = payload.video_url
+    row.video_url = video_url
     row.ticket_url = payload.ticket_url
     row.source_url = payload.source_url
     row.is_active = payload.is_active
@@ -331,6 +367,7 @@ def replace_event(
     row.is_sample = False
 
     db.commit()
+    cache.invalidate()
     return AdminEventOut.from_event(row)
 
 
@@ -347,6 +384,7 @@ def deactivate_event(
         raise HTTPException(status_code=404, detail="Event not found.")
     row.is_active = False
     db.commit()
+    cache.invalidate()
     return AdminEventOut.from_event(row)
 
 
@@ -371,6 +409,11 @@ def client_diagnostics(request: Request) -> dict:
         # The tell: if this is true, the socket peer is a proxy and keying on it would
         # have put every visitor in the same bucket.
         "behind_proxy": bool(sources["cf_connecting_ip"] or sources["x_forwarded_for_raw"]),
+        # How to verify the Cloudflare Transform Rule without guessing: call this
+        # through api.vegasthisweekend.com and secret_matches must be true, then call
+        # the raw *.up.railway.app hostname and it must be false. Only once both hold
+        # is it safe to set REQUIRE_PROXY_SECRET.
+        "proxy_secret": secret_status(request),
     }
 
 
@@ -560,6 +603,7 @@ def create_tip(request: Request, payload: TipWriteIn, db: Session = Depends(get_
     )
     db.add(tip)
     db.commit()
+    cache.invalidate()
     return AdminTipOut.model_validate(tip)
 
 
@@ -580,6 +624,7 @@ def replace_tip(
     tip.is_active = payload.is_active
     tip.priority = payload.priority
     db.commit()
+    cache.invalidate()
     return AdminTipOut.model_validate(tip)
 
 
@@ -595,6 +640,7 @@ def delete_tip(
         raise HTTPException(status_code=404, detail="Tip not found.")
     db.delete(tip)
     db.commit()
+    cache.invalidate()
 
 
 # ------------------------------------------------------------------ status

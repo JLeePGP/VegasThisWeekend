@@ -4,7 +4,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://api.vegasthisweekend.com https://cloudflareinsights.com; img-src 'self' data: https:; media-src 'self' https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; connect-src 'self' https://api.vegasthisweekend.com; img-src 'self' data: https:; media-src 'self' https:; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
 
 # CSP notes:
 #
@@ -22,10 +22,19 @@
 # /interactions there, and a missing entry would show up as analytics quietly recording
 # nothing rather than as an error anyone notices.
 #
-# static.cloudflareinsights.com / cloudflareinsights.com are Cloudflare Web Analytics.
-# Cloudflare injects that beacon at the edge, so it never appears in this repo's HTML and
-# an "it isn't in the source" check will not find it — it only shows up as a console
-# violation on the deployed site.
+# script-src is 'self' with nothing else, and that is the point: the deployed page loads
+# no third-party script at all. The two Cloudflare Web Analytics entries that used to be
+# here (static.cloudflareinsights.com in script-src, cloudflareinsights.com in
+# connect-src) are deliberately gone. That beacon is injected at the edge, so it never
+# appeared in this repo's HTML — an "it isn't in the source" check would not have found
+# it, and it only showed up as a console violation on the deployed site.
+#
+# Removing it from the CSP is the enforcement, not the configuration: Web Analytics must
+# ALSO be switched off in the Cloudflare dashboard, or the beacon keeps being injected and
+# every visitor's browser prints a violation instead of quietly not being tracked. With
+# both done, no visitor's page ever contacts Cloudflare's analytics endpoints, and traffic
+# numbers come from the API's own server-side counters instead — which never see anything
+# beyond what the request already told us.
 #
 # connect-src listed the raw railway.app origin as well during the cutover to the custom
 # API domain, because the CSP ships in this repo while VITE_API_BASE_URL lives in Netlify's

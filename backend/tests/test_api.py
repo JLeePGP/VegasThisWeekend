@@ -190,6 +190,45 @@ class TestGetEvent:
         assert client.get("/events/not-an-id").status_code == 422
 
 
+class TestEdgeCaching:
+    """The public catalog is identical for every visitor, so a shared cache may hold it.
+
+    These assert the header is present where it is safe and — more importantly — absent
+    everywhere it is not. A Cache-Control that leaks onto a per-visitor or authenticated
+    response means the edge serving one person's response to another, which is the worst
+    class of bug this app could have.
+    """
+
+    def test_the_listing_is_cacheable_by_shared_caches(self, client, db):
+        add_event(db)
+        headers = client.get("/events").headers
+        assert "s-maxage=60" in headers["cache-control"]
+        assert "stale-while-revalidate" in headers["cache-control"]
+
+    def test_the_listing_varies_on_origin(self, client, db):
+        """CORS puts the requesting origin in the response, so an edge that ignored this
+        could hand a response built for one origin to another."""
+        add_event(db)
+        assert client.get("/events").headers["vary"] == "Origin"
+
+    def test_a_single_event_is_cacheable(self, client, db):
+        event = add_event(db)
+        assert "s-maxage=60" in client.get(f"/events/{event.id}").headers["cache-control"]
+
+    def test_a_share_list_is_not_cacheable(self, client, db):
+        """A share link is one person's saved events. It must never sit in a shared
+        cache, and it must never be handed to whoever asks next."""
+        event = add_event(db)
+        token = client.post("/share", json={"event_ids": [event.id]}).json()["token"]
+        assert "s-maxage" not in client.get(f"/share/{token}").headers.get("cache-control", "")
+
+    def test_admin_responses_are_not_cacheable(self, admin_client, db):
+        add_event(db)
+        assert "s-maxage" not in admin_client.get("/admin/events").headers.get(
+            "cache-control", ""
+        )
+
+
 class TestCreateShare:
     def test_round_trips_and_preserves_order(self, client, db):
         first = add_event(db, name="First")
