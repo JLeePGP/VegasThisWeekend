@@ -1,0 +1,41 @@
+{
+  "id": "/",
+  "name": "Vegas This Weekend",
+  "short_name": "Vegas",
+  "description": "What's on in Las Vegas this weekend, listed by day. Save what looks good, share it with your group. No account needed.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0B0B11",
+  "background_color": "#0B0B11",
+  "categories": ["events", "entertainment", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Saved events",
+      "short_name": "Saved",
+      "url": "/saved",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -7,6 +7,31 @@
     <meta name="theme-color" content="#0B0B11" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
+    <!--
+      Installable to the home screen. The manifest is the closest thing to the v2 "native
+      app" goal without a rewrite, and it is not only cosmetic: iOS clears a site's
+      localStorage after about seven days without a visit, which is what quietly loses
+      someone's saved events. A web app installed to the home screen is not subject to
+      that, so this is the cheapest fix to the durability problem behind the requests for
+      accounts.
+
+      apple-touch-icon is separate and not redundant: iOS does not read the manifest for
+      the home-screen icon, only this link. Without it the icon becomes a screenshot of
+      the page.
+
+      No service worker, deliberately. The manifest is what makes the app installable;
+      a service worker mainly adds offline support, and a badly scoped one serves a stale
+      bundle after a deploy — a silent failure this project has paid for before.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Vegas" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Both spellings: `apple-` is what older iOS reads, and Chrome logs a deprecation
+         warning unless the standard name is present too. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
     <title>Vegas This Weekend</title>
     <meta
       name="description"

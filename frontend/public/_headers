@@ -4,9 +4,14 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; connect-src 'self' https://api.vegasthisweekend.com; img-src 'self' data: https://media.vegasthisweekend.com; media-src 'self' https://media.vegasthisweekend.com; font-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; connect-src 'self' https://api.vegasthisweekend.com; img-src 'self' data: https://media.vegasthisweekend.com; media-src 'self' https://media.vegasthisweekend.com; font-src 'self'; style-src 'self' 'unsafe-inline'; manifest-src 'self'; upgrade-insecure-requests
 
 # CSP notes:
+#
+# manifest-src is stated rather than left to the default-src fallback. The fallback does
+# cover it — the manifest is same-origin — but a blocked manifest fails the way every
+# other CSP problem on this project has failed: the page looks perfect, the install
+# prompt simply never appears, and nothing in the repo hints at why.
 #
 # media-src is REQUIRED for event videos and its absence is not obvious: with no media-src
 # the browser falls back to default-src 'self' and silently refuses every off-origin video,

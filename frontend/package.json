@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "og": "node tools/og-image/render-og.mjs"
+    "og": "node tools/og-image/render-og.mjs",
+    "icons": "node tools/icons/render-icons.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
