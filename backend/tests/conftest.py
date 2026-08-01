@@ -47,6 +47,7 @@ from app.models import (  # noqa: E402
     InsiderTip,
     ShareList,
     StatCounter,
+    Subscriber,
 )
 
 # Rate limits are asserted separately; leaving them on would make unrelated tests flaky.
@@ -60,7 +61,15 @@ def clean_database():
         # EventTag before Event: SQLite does not enforce foreign keys unless explicitly
         # switched on, so the ON DELETE CASCADE cannot be relied on to clear the child
         # rows here even though it does in Postgres.
-        for model in (EventTag, StatCounter, ExtractionDraft, Event, InsiderTip, ShareList):
+        for model in (
+            EventTag,
+            StatCounter,
+            ExtractionDraft,
+            Event,
+            InsiderTip,
+            ShareList,
+            Subscriber,
+        ):
             session.execute(delete(model))
         session.commit()
     # The read cache lives in the process, not the database, so truncating tables leaves

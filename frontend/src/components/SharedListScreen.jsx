@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { trackDetailOpen, trackSave, trackShareOpen } from '../analytics';
+import { trackSave, trackShareOpen } from '../analytics';
 import { fetchShareList } from '../api';
 import { expiresInDays } from '../format';
 import { useSavedEvents } from '../store/savedEvents';
 import { useToast } from '../store/toast';
 import EmptyState from './EmptyState';
-import EventSheet from './EventSheet';
-import SavedRow from './SavedRow';
+import EventRow from './EventRow';
 
 export default function SharedListScreen() {
   const { token } = useParams();
@@ -16,12 +15,6 @@ export default function SharedListScreen() {
   const { show } = useToast();
 
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
-  const [detail, setDetail] = useState(null);
-
-  const openDetail = useCallback((event) => {
-    trackDetailOpen(event.id);
-    setDetail(event);
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -84,9 +77,18 @@ export default function SharedListScreen() {
         link expires in {expiresInDays(expiresAt)} days.
       </p>
 
-      <ul className="saved-list">
+      <ul className="list">
         {events.map((event) => (
-          <SavedRow key={event.id} event={event} onOpen={openDetail} />
+          <EventRow
+            key={event.id}
+            event={event}
+            withDay
+            onSave={(saveTarget) => {
+              trackSave(saveTarget.id);
+              save(saveTarget);
+            }}
+            isSaved={isSaved(event.id)}
+          />
         ))}
       </ul>
 
@@ -101,14 +103,6 @@ export default function SharedListScreen() {
           </button>
         )}
       </div>
-
-      <EventSheet
-        event={detail}
-        open={detail !== null}
-        onClose={() => setDetail(null)}
-        onSave={save}
-        isSaved={detail ? isSaved(detail.id) : false}
-      />
     </div>
   );
 }

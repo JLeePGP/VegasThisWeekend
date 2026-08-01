@@ -1,31 +1,25 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { trackDetailOpen, trackShareCreate } from '../analytics';
+import { trackShareCreate } from '../analytics';
 import { createShareList } from '../api';
 import { MAX_SHARE_EVENTS } from '../constants';
 import { expiresInDays } from '../format';
 import { useSavedEvents } from '../store/savedEvents';
 import { useToast } from '../store/toast';
+import EmailCapture from './EmailCapture';
 import EmptyState from './EmptyState';
-import EventSheet from './EventSheet';
+import EventRow from './EventRow';
 import { IconClose, IconShare } from './Icons';
-import SavedRow from './SavedRow';
 
 export default function SavedScreen() {
   const navigate = useNavigate();
-  const { saved, remove, save, isSaved } = useSavedEvents();
+  const { saved, remove } = useSavedEvents();
   const { show } = useToast();
-  const [detail, setDetail] = useState(null);
   const [sharing, setSharing] = useState(false);
   // The result stays on screen instead of a toast that vanishes. A toast could say "Link
   // copied" but gave no way to check what had actually been made, or what a recipient
   // would see — which is the part that was missing.
   const [share, setShare] = useState(null); // { url, count, truncated, expiresAt, copied }
-
-  const openDetail = useCallback((event) => {
-    trackDetailOpen(event.id);
-    setDetail(event);
-  }, []);
 
   async function copyLink(url) {
     try {
@@ -88,10 +82,10 @@ export default function SavedScreen() {
         <EmptyState
           icon="♡"
           title="Nothing saved yet"
-          body="Swipe right on anything that looks good and it will show up here, ready to share."
+          body="Tap the heart on anything that looks good and it will show up here, ready to share."
         >
           <button type="button" className="btn btn--primary" onClick={() => navigate('/')}>
-            Start swiping
+            See what's on
           </button>
         </EmptyState>
       </div>
@@ -105,9 +99,11 @@ export default function SavedScreen() {
         Saved on this device only.
       </p>
 
-      <ul className="saved-list">
+      {/* `withDay` because a saved list runs across several days with no headers to
+          group it — a bare time would not say which day it belonged to. */}
+      <ul className="list">
         {saved.map((event) => (
-          <SavedRow key={event.id} event={event} onOpen={openDetail} onRemove={remove} />
+          <EventRow key={event.id} event={event} withDay onRemove={remove} />
         ))}
       </ul>
 
@@ -181,13 +177,9 @@ export default function SavedScreen() {
         )}
       </div>
 
-      <EventSheet
-        event={detail}
-        open={detail !== null}
-        onClose={() => setDetail(null)}
-        onSave={save}
-        isSaved={detail ? isSaved(detail.id) : false}
-      />
+      {/* The second capture point, and the better one: a saved list is someone who has
+          already decided the picks are worth something. */}
+      <EmailCapture source="saved" />
     </div>
   );
 }

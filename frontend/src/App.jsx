@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import DiscoverScreen from './components/DiscoverScreen';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import EventScreen from './components/EventScreen';
+import ListScreen from './components/ListScreen';
 import SavedScreen from './components/SavedScreen';
 import SharedListScreen from './components/SharedListScreen';
 import TabBar from './components/TabBar';
@@ -8,23 +9,23 @@ import { DEFAULT_FILTERS } from './constants';
 import { fullDateLabel } from './format';
 
 export default function App() {
-  // Held here rather than in the screen so a trip to Saved and back does not reset them.
+  // Held here rather than in the screen so a trip to Saved, or into an event and back,
+  // does not reset them.
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
-  // Discover runs immersive: media fills the shell and the chrome floats over it. Saved
-  // and shared lists are ordinary scrolling documents and keep the opaque chrome, so the
-  // mode is a property of the route rather than something the screens negotiate.
-  const immersive = useLocation().pathname === '/';
+  // Every screen is now an ordinary scrolling document with opaque chrome. The immersive
+  // mode that used to apply to the deck — media filling the shell, controls floating over
+  // it — went with the deck itself.
 
-  // Filter changes are no longer counted. Plausible could carry an arbitrary string
-  // prop cheaply; first-party counters are (day, metric, event) rows, and a
-  // combinatorial filter string does not fit that shape without a table whose only job
-  // is saying which chips are popular. Worth adding if that question ever gets asked —
-  // it is not one of the four the PRD cares about.
+  // Filter changes are not counted. Plausible could carry an arbitrary string prop
+  // cheaply; first-party counters are (day, metric, event) rows, and a combinatorial
+  // filter string does not fit that shape without a table whose only job is saying which
+  // chips are popular. Worth adding if that question ever gets asked — it is not one of
+  // the four the PRD cares about.
   const changeFilters = setFilters;
 
   return (
-    <div className={immersive ? 'app app--immersive' : 'app'}>
+    <div className="app">
       <header className="topbar">
         <h1 className="wordmark">Vegas This Weekend</h1>
         <div className="topbar__clock">
@@ -34,7 +35,8 @@ export default function App() {
       </header>
 
       <Routes>
-        <Route path="/" element={<DiscoverScreen filters={filters} onFiltersChange={changeFilters} />} />
+        <Route path="/" element={<ListScreen filters={filters} onFiltersChange={changeFilters} />} />
+        <Route path="/e/:id" element={<EventScreen />} />
         <Route path="/saved" element={<SavedScreen />} />
         <Route path="/s/:token" element={<SharedListScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />

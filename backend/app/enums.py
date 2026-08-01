@@ -40,21 +40,29 @@ class Metric(str, Enum):
     Metrics split into two kinds. The first group is per-event — the counter carries an
     event id and answers "which events land". The second is site-wide, where an event id
     is meaningless and is stored as null.
+
+    Two members are gone with the swipe deck: `skip`, which was a swipe left, and
+    `stack_exhausted`, which was running out of cards. Rows already recorded under those
+    names are untouched and still read out of `stats.summary` — this list governs what
+    the public endpoint will accept from now on, and neither can be produced any more.
+    `list_end` is the honest successor to the second one; the first has no successor,
+    because scrolling past a row is not a decision.
     """
 
     # Per-event
     SAVE = "save"
-    SKIP = "skip"
     DETAIL_OPEN = "detail_open"
     TIP_REVEAL = "tip_reveal"
     TICKET_CLICK = "ticket_click"
     WEBSITE_CLICK = "website_click"
     MAP_CLICK = "map_click"
+    VIDEO_PLAY = "video_play"
 
     # Site-wide
     SHARE_CREATE = "share_create"
     SHARE_OPEN = "share_open"
-    STACK_EXHAUSTED = "stack_exhausted"
+    LIST_END = "list_end"
+    SUBSCRIBE = "subscribe"
     SESSION_START = "session_start"
 
     @property
@@ -65,14 +73,18 @@ class Metric(str, Enum):
 _PER_EVENT_METRICS = frozenset(
     {
         Metric.SAVE,
-        Metric.SKIP,
         Metric.DETAIL_OPEN,
         Metric.TIP_REVEAL,
         Metric.TICKET_CLICK,
         Metric.WEBSITE_CLICK,
         Metric.MAP_CLICK,
+        Metric.VIDEO_PLAY,
     }
 )
+
+# Recorded before the swipe deck was removed on 1 Aug 2026. Not accepted by the public
+# endpoint any more, but `stats.summary` still reports what was already counted.
+LEGACY_METRICS = ("skip", "stack_exhausted")
 
 
 class PriceTier(str, Enum):

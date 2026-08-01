@@ -3,6 +3,11 @@ uvicorn[standard]>=0.37,<1.0
 sqlalchemy>=2.0.44,<2.1
 pydantic>=2.12,<3.0
 pydantic-settings>=2.11,<3.0
+
+# Backs pydantic's EmailStr, used by the newsletter signup. Syntax only — pydantic
+# disables the DNS deliverability check, so no request leaves the server to validate
+# an address.
+email-validator>=2.2,<3.0
 slowapi>=0.1.9,<0.2
 python-dotenv>=1.1,<2.0
 

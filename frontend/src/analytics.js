@@ -10,14 +10,14 @@
 // Two rules this file exists to enforce:
 //
 //   1. Analytics can never break the app. Every path is wrapped; a blocked request, an
-//      offline device or a 500 is a silent no-op, never an exception mid-swipe.
+//      offline device or a 500 is a silent no-op, never an exception mid-interaction.
 //   2. Nothing identifying is ever sent. The payload is a list of {metric, event_id}
 //      and there is no third field to add one to.
 
 import { recordInteractions } from './api';
 
-// Swiping produces a burst of interactions, so they are batched rather than sent one
-// request per gesture. Flushed on whichever comes first.
+// Interactions are batched rather than sent one request per tap. Flushed on whichever
+// comes first.
 const FLUSH_AFTER_MS = 8000;
 const FLUSH_AT_COUNT = 20;
 // Matches the server's per-request ceiling.
@@ -77,15 +77,20 @@ if (typeof window !== 'undefined') {
 
 // --- per-event -------------------------------------------------------------------
 
-/** Swiped right, or saved from the detail sheet. */
+/** Saved, from a list row or from the detail view. */
 export const trackSave = (eventId) => push('save', eventId);
 
-/** Swiped left. Paired with saves this gives a save rate, which is the number that
- *  ranks events honestly — raw saves just rank by time spent near the top of the stack. */
-export const trackSkip = (eventId) => push('skip', eventId);
-
-/** Opened the details. Depth of interest past the swipe. */
+/** Opened the detail view. Interest past the row.
+ *
+ *  There is no counterpart for "decided against it" any more. A swipe left was an
+ *  explicit no, which is what made a save *rate* meaningful; scrolling past a row is not
+ *  a decision, and counting it as one would invent a denominator. See the note in
+ *  backend/app/stats.py on why save_rate is now reported only for the swipe-era data
+ *  that can honestly support it. */
 export const trackDetailOpen = (eventId) => push('detail_open', eventId);
+
+/** Played an event's video. Says whether the mirroring is earning its cost. */
+export const trackVideoPlay = (eventId) => push('video_play', eventId);
 
 /** Revealed an insider tip. Says whether curating them is worth the effort. */
 export const trackTipReveal = (eventId) => push('tip_reveal', eventId);
@@ -107,8 +112,16 @@ export const trackShareCreate = () => push('share_create');
 /** Someone opened a shared link. This is reach, as opposed to intent. */
 export const trackShareOpen = () => push('share_open');
 
-/** Ran out of cards. High numbers mean the catalog is too thin for the filters in use. */
-export const trackStackExhausted = () => push('stack_exhausted');
+/** Scrolled to the end of the listing with no more pages to load. High numbers mean the
+ *  catalog is too thin for the filters in use — the successor to the deck's
+ *  `stack_exhausted`, which was 31% of sessions and the reason sourcing, rather than
+ *  layout, is the thing to fix next. */
+export const trackListEnd = () => push('list_end');
+
+/** Submitted an email address. The signup itself is a row in `subscribers`; this counter
+ *  is the site-wide total, so the conversion can be read against sessions without
+ *  querying the address table at all. */
+export const trackSubscribe = () => push('subscribe');
 
 /** One per page load, as the denominator for everything above. */
 export const trackSessionStart = () => push('session_start');

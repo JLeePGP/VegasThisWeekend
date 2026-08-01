@@ -1,7 +1,7 @@
 # VegasThisWeekend — orientation
 
-Mobile-first Las Vegas event discovery. Swipe, save, share by link. No accounts, no
-cookies, free in v1. Owner: John (GitHub: JLeePGP).
+Mobile-first Las Vegas event discovery. A day-grouped list of what's on: browse, save,
+share by link. No accounts, no cookies, free in v1. Owner: John (GitHub: JLeePGP).
 
 **This file is a router, not a manual.** Read only what the task needs.
 
@@ -13,14 +13,19 @@ cookies, free in v1. Owner: John (GitHub: JLeePGP).
 | Setup, architecture, analytics, design rationale | `README.md` |
 | Nothing | don't preload the others "for context" — they are long |
 
-## Status as of 30 Jul 2026
+## Status as of 1 Aug 2026
 
 **Live and working.** Site `https://vegasthisweekend.com`, API
-`https://api.vegasthisweekend.com`, 10 real events, 293 tests passing.
+`https://api.vegasthisweekend.com`, 14 real events, 342 tests passing.
 
-**John's current phase is not building.** He is adding events and getting the app in front
-of people. Do not start feature work unless he asks — if he reports something broken while
-doing that, fix it; otherwise the backlog is paused on purpose.
+**The swipe deck is gone.** Update 1 replaced it with a day-grouped list after launch
+feedback — 8 of 25 people asked for a list unprompted. If you find a reference to swiping,
+a card stack, dismissals or `stack_exhausted` anywhere, it is stale and should be fixed
+rather than followed. `BACKLOG.md` carries the reasoning.
+
+**Build work is active.** After Update 1 the priority is events, not features: 31% of
+sessions reached the end of the catalog, so sourcing is the binding constraint and no
+layout change improves it.
 
 Five things are built but switched off, all needing dashboard access John has and you
 don't: R2 credentials, the Cloudflare cache rule, the Web Analytics toggle, the proxy
@@ -36,6 +41,11 @@ worked. Don't re-derive or re-plan these; they're written down.
 - **Align before building.** Ask clarifying questions on anything new before writing code.
 - **Never print secrets into the transcript.** They live in
   `Desktop/Vibe_Coding_Projects/Keys/`, outside the repo.
+- **`subscribers` is the only table holding personal data**, and the newsletter is the one
+  deliberate exception to "no accounts, no cookies". Nothing about a signup request is
+  stored beyond the address and which screen it came from — no IP, no user agent. Do not
+  add a column that changes that, and remember a database export now contains real email
+  addresses: private backup bucket only.
 - Production and local `ADMIN_TOKEN` values are different.
 - Migrations are **additive-only** (expand-then-contract). A `downgrade` once wiped a dev
   database. There is no confirmed production backup yet.

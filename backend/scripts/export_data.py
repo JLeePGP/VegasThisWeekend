@@ -22,6 +22,10 @@ when those tools exist.
 Tables are discovered from the catalog rather than listed, deliberately: a table added and
 then forgotten silently goes unbacked-up otherwise, and the whole failure mode here is
 finding out too late.
+
+One consequence of that, worth knowing before handling an export: since `subscribers`
+exists, a dump contains newsletter email addresses. It belongs in the private backup
+bucket and nowhere else — not a Downloads folder that syncs, not an attachment.
 """
 
 from __future__ import annotations

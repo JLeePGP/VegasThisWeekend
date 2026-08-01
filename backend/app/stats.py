@@ -147,22 +147,27 @@ def summary(session: Session, days: int = 30) -> dict:
 
     for entry in events.values():
         saves = entry["metrics"].get(Metric.SAVE.value, 0)
-        skips = entry["metrics"].get(Metric.SKIP.value, 0)
-        decisions = saves + skips
-        # The number that actually ranks an event: of the people who saw it and decided,
-        # how many wanted it. Raw saves just rank by how long a card sat near the top of
-        # the stack.
-        entry["save_rate"] = round(saves / decisions, 3) if decisions else None
-        entry["decisions"] = decisions
+        skips = entry["metrics"].get("skip", 0)
+        # A save *rate* needed a denominator, and the swipe deck supplied one: a swipe
+        # left was an explicit no. A list has no such thing — scrolling past a row is not
+        # a decision, and there is no impression counter to stand in for one.
+        #
+        # So the rate is reported only where skips exist, which now means only the data
+        # recorded before 1 Aug 2026. The alternative was saves/(saves+0), which is 100%
+        # for every event that has ever been saved and 0% for the rest: a number that
+        # looks like a measurement and is not one. Events rank by saves instead.
+        entry["decisions"] = saves + skips
+        entry["save_rate"] = round(saves / (saves + skips), 3) if skips else None
 
     by_vibe: dict[str, dict[str, int]] = {}
     for entry in events.values():
         bucket = by_vibe.setdefault(entry["vibe"], {"saves": 0, "skips": 0})
         bucket["saves"] += entry["metrics"].get(Metric.SAVE.value, 0)
-        bucket["skips"] += entry["metrics"].get(Metric.SKIP.value, 0)
+        bucket["skips"] += entry["metrics"].get("skip", 0)
     for bucket in by_vibe.values():
-        decisions = bucket["saves"] + bucket["skips"]
-        bucket["save_rate"] = round(bucket["saves"] / decisions, 3) if decisions else None
+        # Same reasoning as above: no skips means no denominator, not a perfect score.
+        skips = bucket["skips"]
+        bucket["save_rate"] = round(bucket["saves"] / (bucket["saves"] + skips), 3) if skips else None
 
     return {
         "days": days,

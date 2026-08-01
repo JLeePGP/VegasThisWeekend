@@ -1,9 +1,10 @@
 # VegasThisWeekend
 
-Mobile-first Las Vegas event discovery. Open it, swipe through what's on, save what looks
-good, share it with your group. No account, no planning session.
+Mobile-first Las Vegas event discovery. Open it, read what's on tonight and this weekend,
+save what looks good, share it with your group. No account, no planning session.
 
-**Phase 1: the consumer app.** Swipe stack, filters, saved list, share links, insider tips.
+**Phase 1: the consumer app.** Day-grouped listing, filters, saved list, share links,
+insider tips.
 **Phase 2: the admin panel** — paste a URL, Claude drafts the event, John confirms and saves.
 
 ---
@@ -45,7 +46,8 @@ live database immediately — the header says `writing to production` in red whe
 | Database | ✅ Postgres on Railway, migrations applied, **10 real events** |
 | Website | ✅ live (Netlify, proxied through Cloudflare) |
 | HTTPS + canonical host | ✅ `http` → `https` 301, `www` → apex 301, HSTS set |
-| Swipe stack, full-screen cards, video, filters, saved list, share links, tips | ✅ built, verified in-browser |
+| Day-grouped listing, event pages, video player, filters, saved list, share links, tips | ✅ built, verified in-browser |
+| Newsletter signup (`POST /subscribers`, own table — no third-party form) | ✅ built |
 | Sober + Fitness filters, multi-category tagging, street address & Maps link | ✅ shipped |
 | Admin panel: manual entry, list, edit, tips, duplicates, series | ✅ built, verified in-browser |
 | Analytics | ✅ first-party counters + admin Stats tab. **No third-party script on the page at all** |
@@ -103,7 +105,7 @@ npm run dev
 ```
 
 The dev server also binds to your LAN, so you can open it on a real phone — which is the
-only honest way to judge a swipe interaction.
+only honest way to judge a listing that is read with a thumb.
 
 ### Admin panel — http://localhost:5174
 
@@ -239,7 +241,7 @@ frontend/src/
   constants.js       filter vocabularies (mirror of the backend enums)
   store/             saved events (localStorage), toasts
   hooks/useEvents.js paging and filtering
-  components/        SwipeStack, EventCard, Poster, FilterBar, EventSheet, screens
+  components/        EventRow, Poster, FilterBar, VideoPlayer, EmailCapture, screens
 ```
 
 ### Decisions worth knowing
@@ -253,7 +255,7 @@ midnight. A party running Friday 10pm to Saturday 3am is a Friday night, and a T
 10pm party is *not* part of the weekend just because it spills past midnight. 5am is also
 the safe choice across DST — unlike 1am it never happens twice, and unlike 2am it never
 fails to happen. Consequence: a genuine multi-day festival wants one row per day, which is
-also what makes sense on a swipe card.
+also what the day headers in the listing need.
 
 **Filtering is on start time, not overlap.** Directly out of the rule above.
 
@@ -281,7 +283,7 @@ contain text aimed at the model. Three independent controls: the output schema c
 the shape, URL fields are checked against a scheme allowlist, and a human reviews every
 draft. None of the three is sufficient alone.
 
-**A residency is stored as the nights it actually runs.** The swipe stack, the date
+**A residency is stored as the nights it actually runs.** The listing, the date
 filters and the share snapshots all assume concrete rows, so recurrence is expanded at
 save time rather than modelled as a rule. Occurrences are generated in wall-clock time, so
 a 10pm night stays at 10pm across a DST change.
@@ -384,16 +386,20 @@ because the frontend deliberately never sends event ids to anyone else.
 | Counter | Answers |
 |---|---|
 | `session_start` | Visits |
-| `save` / `skip` | Per event and in total — the raw signal |
-| **Save rate** | Of the people who *decided*, how many wanted it. Raw saves just rank by how long a card sat near the top of the stack |
-| `detail_open` | Depth of interest past the swipe |
+| `save` | Per event and in total — the raw signal, and what events are ranked by |
+| `detail_open` | Interest past the row |
+| `video_play` | Whether mirroring video is earning its cost |
 | `ticket_click`, `website_click`, `map_click` | Closest thing to a conversion this app has |
 | `tip_reveal` | Whether curating tips is worth the effort |
 | `share_create` vs `share_open` | Intent vs **actual reach** — created is a wish, opened is spread |
-| `stack_exhausted` | Catalog too thin for the filters in use. **Watch this one early** — it tells you to add more events |
+| `list_end` | Reached the bottom of the listing: catalog too thin for the filters in use. **Watch this one early** — it tells you to add more events |
+| `subscribe` | Newsletter signups, as a site-wide total |
 
-Save rates from fewer than 5 decisions are dimmed, because one save out of one view is 100%
-and means nothing.
+**`skip`, `stack_exhausted` and save rate are swipe-era only.** They stopped being
+produced on 1 Aug 2026 when the deck was removed, and the Stats tab hides them once a
+range contains none. Save rate is deliberately blank for anything after that date: a rate
+needs an explicit no, which a swipe left was and scrolling past a row is not. Reporting
+saves/(saves+0) would show a flawless rate for every event that has ever been saved.
 
 **What it stores:** counts per day, per metric, per event. No sessions, no IP addresses,
 nothing that identifies anyone — the table has nowhere to put a person, and a test asserts
@@ -402,7 +408,7 @@ that.
 ### 2. Cloudflare dashboard — *how much traffic*
 
 `vegasthisweekend.com` zone → **Analytics & Logs → Traffic**. Pageviews, countries,
-bandwidth, threats blocked. Free, comes from proxying alone, and sees nothing about swipes.
+bandwidth, threats blocked. Free, comes from proxying alone, and sees nothing about saves.
 It complements the Stats tab rather than competing with it.
 
 This is server-side traffic analytics, **not** Web Analytics (the RUM beacon) — that one is

@@ -70,6 +70,43 @@ export function dayLabel(value) {
   return weekdayAndDate.format(new Date(value));
 }
 
+/**
+ * A heading for a whole listing day: `{ lead, date }`.
+ *
+ * `lead` is "Today" or "Tomorrow" where one applies, and null otherwise — the header
+ * covers a whole day, so the evening-only "Tonight" that `dayLabel` uses for a single
+ * event would be wrong above a 2pm one. `date` is always present, because a header
+ * reading only "Today" gives someone scrolling nothing to orient by.
+ */
+export function dayHeading(isoDay) {
+  const today = listingDate(new Date());
+  // Noon UTC is 5am in Vegas — the same calendar day under either zone, which parsing
+  // the bare date string is not: that is UTC midnight, and formats as the day before.
+  const date = weekdayAndDate.format(new Date(`${isoDay}T12:00:00Z`));
+
+  if (isoDay === today) return { lead: 'Today', date };
+  if (isoDay === shiftDay(today, 1)) return { lead: 'Tomorrow', date };
+  return { lead: null, date };
+}
+
+/**
+ * Events in listing-day buckets, order preserved: `[{ day, events }]`.
+ *
+ * Relies on the server returning them chronologically, which is why the listing endpoint
+ * promotes nothing out of time order — a promoted row would land in the wrong bucket, or
+ * open a second bucket for a day that already had one.
+ */
+export function groupByDay(events) {
+  const groups = [];
+  for (const event of events) {
+    const day = listingDate(event.start_at);
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.events.push(event);
+    else groups.push({ day, events: [event] });
+  }
+  return groups;
+}
+
 /** "9:00 PM" */
 export const timeLabel = (value) => timeOnly.format(new Date(value));
 

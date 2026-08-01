@@ -67,6 +67,17 @@ export function fetchEvents({
 
 export const fetchEvent = (id, { signal } = {}) => request(`/events/${id}`, { signal });
 
+/**
+ * Newsletter signup.
+ *
+ * Goes to our own API rather than to a provider's embedded form, which is why this is
+ * three lines instead of a script tag: an embed would load a third-party frame on the
+ * page and hand that company the IP of everyone who scrolled past it. The site currently
+ * contacts no third-party host at all, and a mailing list is not worth being the first.
+ */
+export const subscribe = (email, source) =>
+  request('/subscribers', { method: 'POST', body: { email, source } });
+
 export const createShareList = (eventIds) =>
   request('/share', { method: 'POST', body: { event_ids: eventIds } });
 

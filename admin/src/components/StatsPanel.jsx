@@ -210,7 +210,12 @@ export default function StatsPanel() {
 
   const t = data.totals;
   const decisions = (t.save ?? 0) + (t.skip ?? 0);
-  const overallRate = decisions ? (t.save ?? 0) / decisions : null;
+  // Only where skips exist, which since 1 Aug 2026 means only the swipe-era range. A
+  // list has no explicit "no", so saves/(saves+0) would report a flawless rate forever.
+  const overallRate = t.skip ? (t.save ?? 0) / decisions : null;
+  // Whether this range still contains swipe-deck data at all. Drives whether the columns
+  // that only that data can fill are worth showing.
+  const hasSwipeEra = Boolean(t.skip || t.stack_exhausted);
 
   const rankedVibes = Object.entries(data.by_vibe)
     .map(([vibe, stats]) => ({ vibe, ...stats, decisions: stats.saves + stats.skips }))
@@ -239,12 +244,17 @@ export default function StatsPanel() {
       <div className="tiles">
         <Tile label="Visits" value={num(t.session_start)} />
         <Tile label="Saves" value={num(t.save)} />
-        <Tile label="Skips" value={num(t.skip)} />
-        <Tile
-          label="Save rate"
-          value={pct(overallRate)}
-          hint={`${num(decisions)} decisions`}
-        />
+        <Tile label="Signups" value={num(t.subscribe)} hint="newsletter" />
+        {hasSwipeEra && (
+          <>
+            <Tile label="Skips" value={num(t.skip)} hint="swipe era, ended 1 Aug" />
+            <Tile
+              label="Save rate"
+              value={pct(overallRate)}
+              hint={`${num(decisions)} decisions, swipe era`}
+            />
+          </>
+        )}
         <Tile label="Links shared" value={num(t.share_create)} />
         <Tile
           label="Links opened"
@@ -256,25 +266,41 @@ export default function StatsPanel() {
         <Tile label="Websites clicked" value={num(t.website_click)} />
         <Tile label="Maps opened" value={num(t.map_click)} />
         <Tile label="Tips revealed" value={num(t.tip_reveal)} />
+        <Tile label="Videos played" value={num(t.video_play)} />
+        {/* The successor to "ran out of cards", and the same signal: people reaching the
+            bottom of the listing means the catalog is too thin for the filters they
+            picked. It was 31% of sessions on the deck, which is why sourcing rather than
+            layout is the thing to fix. */}
         <Tile
-          label="Ran out of cards"
-          value={num(t.stack_exhausted)}
+          label="Reached the end"
+          value={num(t.list_end)}
           hint="catalog too thin"
         />
+        {hasSwipeEra && (
+          <Tile
+            label="Ran out of cards"
+            value={num(t.stack_exhausted)}
+            hint="swipe era, ended 1 Aug"
+          />
+        )}
       </div>
 
       <section className="stats__section">
         <h3>Saves and skips per day</h3>
+        <p className="muted stats__note">
+          The skip line stops at 1 Aug 2026, when the swipe deck was removed. It is not a
+          drop in interest — nothing produces a skip any more.
+        </p>
         <DailyChart daily={data.daily} days={data.days} />
       </section>
 
       <section className="stats__section">
         <h3>Which events land</h3>
         <p className="muted stats__note">
-          Ranked by saves. Save rate is of the people who <em>decided</em> — raw saves
-          just rank by how long a card sat near the top of the stack. Rates from fewer
-          than {MIN_DECISIONS} decisions are dimmed, because one save out of one view is
-          100%.
+          Ranked by saves. Save rate is blank for anything after 1 Aug 2026 and that is
+          deliberate: a rate needs an explicit no, which a swipe left was and scrolling
+          past a row is not. Where it does show, rates from fewer than {MIN_DECISIONS}{' '}
+          decisions are dimmed, because one save out of one view is 100%.
         </p>
         {data.events.length === 0 ? (
           <p className="muted">Nothing recorded yet.</p>

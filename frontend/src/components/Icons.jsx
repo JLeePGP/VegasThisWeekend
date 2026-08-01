@@ -14,21 +14,9 @@ const base = {
   focusable: false,
 };
 
-export const IconSkip = (props) => (
-  <svg {...base} {...props}>
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-
 export const IconSave = (props) => (
   <svg {...base} fill="currentColor" stroke="none" {...props}>
     <path d="M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13Z" />
-  </svg>
-);
-
-export const IconChevronUp = (props) => (
-  <svg {...base} {...props}>
-    <path d="m6 14 6-6 6 6" />
   </svg>
 );
 
@@ -92,6 +80,14 @@ export const IconGlobe = (props) => (
   <svg {...base} {...props}>
     <circle cx="12" cy="12" r="9" />
     <path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z" />
+  </svg>
+);
+
+// Filled rather than stroked: a play triangle drawn in 1.9px strokes reads as an
+// outline of a shape instead of the shape itself at button size.
+export const IconPlay = (props) => (
+  <svg {...base} fill="currentColor" stroke="none" {...props}>
+    <path d="M8 5.2a1 1 0 0 1 1.5-.87l9.1 5.3a1 1 0 0 1 0 1.73l-9.1 5.3A1 1 0 0 1 8 15.8Z" />
   </svg>
 );
 

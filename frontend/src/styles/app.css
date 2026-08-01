@@ -24,7 +24,7 @@ body {
   background: var(--ink-950);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* The swipe stack owns horizontal gestures; stop the page rubber-banding underneath. */
+  /* The list scrolls inside .screen, so the page itself never should. */
   overscroll-behavior: none;
 }
 
@@ -246,237 +246,196 @@ a {
   font-size: 0.72rem;
 }
 
-/* ------------------------------------------------------------------ swipe stack */
+/* ------------------------------------------------------------------ the list */
+/* What replaced the swipe deck. A day header, then that day's events in time order —
+   the shape that lets someone answer "what else is on at 9pm?", which is the question a
+   card stack could not physically answer. */
 
-.discover {
+/* The filters travel with the list rather than scrolling away: they are the only thing
+   that changes what is below them, and a list long enough to need scrolling is exactly
+   when someone wants to narrow it. */
+.screen > .filterbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-inline: 0;
+  padding-block: var(--space-2) var(--space-3);
+  background: var(--ink-900);
+}
+
+.day + .day {
+  margin-top: var(--space-5);
+}
+
+.day__heading {
   display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  padding: 0 var(--space-4);
-}
-
-.stack {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-}
-
-.stack__slot {
-  position: absolute;
-  inset: 0;
-  will-change: transform, opacity;
-}
-
-.stack__slot[data-depth='0'] {
-  z-index: 3;
-}
-
-/* Cards behind the top one are inert and ease into place as the stack advances. */
-.stack__slot[data-depth='1'],
-.stack__slot[data-depth='2'] {
-  pointer-events: none;
-  transition: transform 0.32s var(--ease-out);
-}
-
-.stack__slot[data-depth='1'] {
-  z-index: 2;
-  transform: scale(0.945) translateY(10px);
-}
-
-.stack__slot[data-depth='2'] {
-  z-index: 1;
-  transform: scale(0.89) translateY(20px);
-}
-
-.stack__slot[data-settling='true'] {
-  transition: transform 0.34s var(--ease-out);
-}
-
-.stack__slot[data-leaving='true'] {
-  transition: transform 0.3s var(--ease-out), opacity 0.3s linear;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* ------------------------------------------------------------------ card */
-
-.card {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-  background: var(--ink-850);
-  touch-action: pan-y;
-  user-select: none;
-}
-
-/* Legibility wash under the text. The media behind it is arbitrary — a bright venue
-   photo would otherwise leave white type on white. */
-.card__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    linear-gradient(to top, rgba(6, 6, 10, 0.94) 0%, rgba(6, 6, 10, 0.78) 26%, rgba(6, 6, 10, 0.1) 58%, transparent 74%),
-    linear-gradient(to bottom, rgba(6, 6, 10, 0.7) 0%, transparent 26%);
-}
-
-.card__chips {
-  display: flex;
+  align-items: baseline;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
+  /* Sits below the filter bar, not under it. */
+  position: sticky;
+  top: 52px;
+  z-index: 4;
+  padding: var(--space-2) 0;
+  background: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.card__chip {
-  padding: 5px 10px;
-  font-size: 0.7rem;
-  font-weight: 600;
+.day__lead {
+  color: var(--cyan);
+}
+
+.day__date {
+  color: var(--text-hi);
+}
+
+.day__lead + .day__date {
+  font-size: var(--step-0);
+  font-weight: 500;
+  color: var(--text-low);
+}
+
+.day__count {
+  margin-left: auto;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-hi);
-  background: rgba(6, 6, 10, 0.62);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--radius-pill);
+  color: var(--text-low);
 }
 
-.card__chip--price {
-  margin-left: auto;
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
 }
 
-.card__meta {
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: var(--space-5) var(--space-4) var(--chrome-bottom, var(--space-4));
+.row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  background: var(--ink-850);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
-.card__when {
+.row__main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+
+.row__poster {
+  position: relative;
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.row__when {
   display: block;
-  margin-bottom: var(--space-2);
-  font-size: var(--step--1);
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--cyan);
 }
 
-.card__title {
+.row__title {
+  display: block;
+  margin-top: 2px;
   font-family: var(--font-display);
-  font-size: var(--step-3);
-  font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: -0.025em;
-  /* Two lines keeps every card the same shape however long the name is. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card__venue {
-  margin-top: var(--space-2);
   font-size: var(--step-0);
-  color: var(--text-mid);
-}
-
-.card__hook {
-  margin-top: var(--space-3);
-  font-size: var(--step-0);
-  line-height: 1.45;
-  color: var(--text-mid);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* ------------------------------------------------------------------ card links */
-
-.card__links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
-.cardlink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 15px;
-  font-size: var(--step--1);
   font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
   color: var(--text-hi);
-  text-decoration: none;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.11);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-pill);
-  transition: background 0.16s, border-color 0.16s;
 }
 
-.cardlink:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.34);
+.row__meta {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 3px;
+  font-size: var(--step--1);
+  color: var(--text-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cardlink--primary {
-  color: var(--ink-950);
-  background: var(--text-hi);
-  border-color: transparent;
-}
-
-.cardlink--primary:hover {
-  background: #fff;
-  border-color: transparent;
-}
-
-.cardlink--details {
+.row__price {
+  flex-shrink: 0;
   margin-left: auto;
+  color: var(--text-low);
 }
 
-/* Verdict stamps. Pinned to the stack rather than the card, so they hold still while
-   the card slides underneath — see the note in SwipeStack. Deliberately loud: at the
-   old size and opacity they were easy to miss mid-gesture. */
-.stack__verdict {
-  position: absolute;
-  top: 30%;
-  z-index: 6;
-  padding: 10px 22px;
-  font-family: var(--font-display);
-  font-size: clamp(1.75rem, 9vw, 2.6rem);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.row__past {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  border: 4px solid currentColor;
-  border-radius: var(--radius-md);
-  pointer-events: none;
-  backdrop-filter: blur(3px);
+  color: var(--text-low);
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-pill);
 }
 
-.stack__verdict--save {
-  right: var(--space-5);
+/* Full height of the row, so saving is a comfortable target next to a 58px thumbnail
+   rather than a 30px circle floating beside it. */
+.row__save,
+.row__remove {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  color: var(--text-low);
+  transition: color 0.16s, background 0.16s;
+}
+
+.row__save:hover {
   color: var(--pink);
-  background: rgba(255, 46, 136, 0.22);
-  text-shadow: 0 2px 18px rgba(255, 46, 136, 0.55);
-  box-shadow: 0 0 30px rgba(255, 46, 136, 0.45);
-  transform: rotate(11deg);
+  background: var(--pink-soft);
 }
 
-.stack__verdict--skip {
-  left: var(--space-5);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.16);
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
-  transform: rotate(-11deg);
+.row__save.is-saved {
+  color: var(--pink);
+}
+
+.row__remove:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+/* Zero-height marker the pager watches for. */
+.list__sentinel {
+  height: 1px;
+}
+
+/* Shorter than the first-load skeleton: this one stands in for the next few rows, not
+   for the whole list. */
+.skeleton--rows {
+  min-height: 140px;
+  margin-top: var(--space-3);
 }
 
 /* ------------------------------------------------------------------ poster */
@@ -488,19 +447,12 @@ a {
   background: linear-gradient(var(--poster-angle, 145deg), var(--poster-1), var(--poster-2));
 }
 
-.poster__img,
-.poster__video {
+.poster__img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-/* A video is decoration behind the card, never a player: no controls, no focus stop,
-   and it must not intercept the swipe gesture. */
-.poster__video {
-  pointer-events: none;
 }
 
 /* Two soft light sources so the flat gradient gains some depth. Kept restrained: a
@@ -551,69 +503,6 @@ a {
   opacity: 0.16;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* ------------------------------------------------------------------ swipe actions */
-
-.actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  padding: var(--space-4) 0 var(--space-3);
-}
-
-.action {
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid var(--ink-700);
-  background: var(--ink-800);
-  color: var(--text-mid);
-  box-shadow: var(--shadow-lift);
-  transition: transform 0.16s var(--ease-snap), color 0.16s, border-color 0.16s;
-}
-
-.action:active {
-  transform: scale(0.9);
-}
-
-.action:disabled {
-  opacity: 0.35;
-  box-shadow: none;
-}
-
-.action--skip,
-.action--save {
-  width: 62px;
-  height: 62px;
-}
-
-.action--details {
-  width: 48px;
-  height: 48px;
-}
-
-.action--skip:hover:not(:disabled) {
-  color: var(--red);
-  border-color: var(--red);
-}
-
-.action--save {
-  color: var(--pink);
-  border-color: rgba(255, 46, 136, 0.42);
-  background: var(--pink-soft);
-}
-
-.action--save:hover:not(:disabled) {
-  border-color: var(--pink);
-}
-
-.hint {
-  padding-bottom: var(--space-3);
-  font-size: var(--step--1);
-  color: var(--text-low);
-  text-align: center;
 }
 
 /* ------------------------------------------------------------------ tab bar */
@@ -760,34 +649,6 @@ a {
   }
 }
 
-/* ------------------------------------------------------------------ detail sheet */
-
-.detail__poster {
-  position: relative;
-  height: 190px;
-  flex-shrink: 0;
-}
-
-.detail__close {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  color: var(--text-hi);
-  background: rgba(6, 6, 10, 0.66);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 50%;
-}
-
-.detail__head {
-  padding: var(--space-4) var(--space-4) var(--space-3);
-}
-
 .detail__title {
   font-family: var(--font-display);
   font-size: var(--step-3);
@@ -868,6 +729,176 @@ a {
   color: #f0d9ae;
 }
 
+/* ------------------------------------------------------------------ detail page */
+/* Was a bottom sheet over the deck; now its own route. The image is a bounded hero with
+   text on the page's own surface below it, rather than type floating over an
+   unpredictable photo. */
+
+.screen--detail {
+  padding-bottom: var(--space-6);
+}
+
+.detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--text-mid);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-pill);
+}
+
+.detail__hero {
+  position: relative;
+  height: 210px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Over the hero rather than below it, so the affordance is on the image it belongs to.
+   Solid enough to read against any photograph. */
+.detail__play {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 16px;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-950);
+  background: var(--text-hi);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lift);
+}
+
+.detail__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+/* ------------------------------------------------------------------ video player */
+/* Full-screen, contained, on black. Event video is vertical 9:16 and cropping it loses
+   the performer at the top and the crowd at the bottom, so it is never fitted to a shape
+   the app would prefer. */
+
+.player {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+
+.player__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.player__close {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-3));
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--text-hi);
+  background: rgba(6, 6, 10, 0.66);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+}
+
+/* ------------------------------------------------------------------ email signup */
+
+.signup {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  background: var(--ink-850);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-lg);
+}
+
+.signup__title {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-hi);
+}
+
+.signup__body {
+  margin-top: var(--space-2);
+  font-size: var(--step-0);
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+
+.signup__form {
+  margin-top: var(--space-4);
+}
+
+.signup__label {
+  /* Present for screen readers; the placeholder and the surrounding copy carry it
+     visually, and a second heading above the field would crowd the card. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.signup__row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.signup__input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3);
+  font: inherit;
+  font-size: var(--step-0);
+  color: var(--text-hi);
+  background: var(--ink-900);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-md);
+}
+
+.signup__input::placeholder {
+  color: var(--text-low);
+}
+
+.signup__input:focus-visible {
+  border-color: var(--cyan);
+}
+
+.signup__note {
+  margin-top: var(--space-3);
+  font-size: var(--step--1);
+  color: var(--text-low);
+}
+
+.signup__error {
+  margin-top: var(--space-3);
+  font-size: var(--step--1);
+  color: var(--red);
+}
+
+.signup--done {
+  border-color: rgba(46, 230, 224, 0.35);
+}
+
 /* ------------------------------------------------------------------ buttons */
 
 .btn {
@@ -928,99 +959,6 @@ a {
   font-size: var(--step-0);
 }
 
-.saved-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  list-style: none;
-  padding: 0;
-}
-
-.saved-row {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--ink-850);
-  border: 1px solid var(--ink-700);
-  border-radius: var(--radius-md);
-}
-
-.saved-row__poster {
-  position: relative;
-  flex-shrink: 0;
-  width: 62px;
-  height: 62px;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.saved-row__main {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.saved-row__when {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--cyan);
-}
-
-.saved-row__title {
-  display: block;
-  margin-top: 2px;
-  font-family: var(--font-display);
-  font-size: var(--step-1);
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-  color: var(--text-hi);
-}
-
-.saved-row__venue {
-  display: block;
-  margin-top: 2px;
-  font-size: var(--step--1);
-  font-weight: 400;
-  color: var(--text-mid);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.saved-row__past {
-  display: inline-block;
-  margin-top: var(--space-2);
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-low);
-  border: 1px solid var(--ink-600);
-  border-radius: var(--radius-pill);
-}
-
-.saved-row__remove {
-  flex-shrink: 0;
-  align-self: flex-start;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  color: var(--text-low);
-  border-radius: 50%;
-  transition: color 0.16s, background 0.16s;
-}
-
-.saved-row__remove:hover {
-  color: var(--red);
-  background: var(--red-soft);
-}
-
 .sharebar {
   position: sticky;
   bottom: 0;
@@ -1070,8 +1008,11 @@ a {
   margin-top: var(--space-2);
 }
 
+/* Sized in its own right rather than filling a parent: the deck's skeleton stood in for
+   a card that was the height of the screen, where this stands in for a list that scrolls
+   inside one. */
 .skeleton {
-  height: 100%;
+  min-height: 40vh;
   border-radius: var(--radius-lg);
   border: 1px solid var(--ink-700);
   background: linear-gradient(100deg, var(--ink-800) 30%, var(--ink-750) 50%, var(--ink-800) 70%);
@@ -1190,122 +1131,6 @@ a {
 
 .crash__button:active {
   transform: translateY(0);
-}
-
-/* ------------------------------------------------- immersive discover shell */
-/* Media fills the whole shell and every control floats over it. Applied by route:
-   Discover only. Saved and shared lists stay ordinary scrolling documents. */
-
-.app--immersive {
-  /* How far the card's own content must stay clear of the floating chrome. These are
-     measured against the real controls below — if you resize the action buttons or the
-     tab bar, retune these two numbers or the title will slide under them. */
-  --chrome-top: calc(var(--safe-top) + 116px);
-  --chrome-bottom: calc(var(--safe-bottom) + 186px);
-}
-
-/* The media layer. Behind everything, but above .app::before. */
-.app--immersive .stage {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-/* The stack fills the stage rather than a flex slot. */
-.app--immersive .stage > .stack {
-  position: absolute;
-  inset: 0;
-}
-
-/* Empty, error and loading states sit in the readable middle rather than under the
-   floating chrome. The empty state is `.state`, not `.empty` — an earlier version of
-   this rule guessed the class name and silently did nothing. It happened to look right
-   anyway because `.state` centres itself, which is exactly how dead CSS survives. */
-.app--immersive .stage > .state,
-.app--immersive .stage > .skeleton {
-  position: absolute;
-  inset: var(--chrome-top) var(--space-4) var(--chrome-bottom);
-}
-
-/* Full bleed: no rounded corners or inset, so the media reaches the edges. */
-.app--immersive .card {
-  border-radius: 0;
-}
-
-/* The deck no longer scales down behind the top card — at full bleed a scaled card
-   shows a strip of background down both edges and reads as a rendering fault rather
-   than as depth. The next card simply waits directly behind. */
-.app--immersive .stack__slot[data-depth='1'],
-.app--immersive .stack__slot[data-depth='2'] {
-  transform: none;
-}
-
-/* --- floating chrome --- */
-
-.app--immersive .topbar,
-.app--immersive .filterbar {
-  background: transparent;
-}
-
-/* One scrim behind the whole top chrome. Put on the topbar rather than each control so
-   the two do not show a seam between them. */
-.app--immersive .topbar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  bottom: -80px;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(to bottom, rgba(6, 6, 10, 0.82) 0%, rgba(6, 6, 10, 0.45) 45%, transparent);
-}
-
-.app--immersive .topbar {
-  position: relative;
-  z-index: 4;
-}
-
-.app--immersive .filterbar {
-  position: relative;
-  z-index: 4;
-}
-
-/* Transparent spacer between the filters and the controls. It must not swallow pointer
-   events or the lower half of the card stops being swipeable. */
-.app--immersive .discover {
-  justify-content: flex-end;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.app--immersive .actions,
-.app--immersive .hint {
-  pointer-events: auto;
-}
-
-.app--immersive .tabbar {
-  position: relative;
-  z-index: 5;
-  border-top: 0;
-  background: linear-gradient(to top, rgba(6, 6, 10, 0.95) 40%, rgba(6, 6, 10, 0.55) 75%, transparent);
-}
-
-/* Solid pills over arbitrary photography — the outline-only treatment vanished against
-   a bright image. */
-.app--immersive .action {
-  background: rgba(18, 18, 26, 0.82);
-  backdrop-filter: blur(10px);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.app--immersive .action--save {
-  background: rgba(255, 46, 136, 0.24);
-  border-color: rgba(255, 46, 136, 0.55);
-}
-
-.app--immersive .banner {
-  position: relative;
-  z-index: 4;
-  backdrop-filter: blur(10px);
 }
 
 .detail__link {

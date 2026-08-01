@@ -1,14 +1,15 @@
-// Saved and dismissed events live in localStorage and nowhere else. No account, no
-// server-side identity — the list belongs to the device.
+// Saved events live in localStorage and nowhere else. No account, no server-side
+// identity — the list belongs to the device.
+//
+// Dismissals used to live here too. They only existed to keep a swiped-away card out of
+// the deck; a list has nothing to remove an event from, and an event you scrolled past
+// is not a decision worth remembering. The `vtw.dismissed.v1` key is deliberately not
+// cleaned up — it expires on its own, and reaching into storage a visitor's browser
+// still holds to delete something is worse than leaving a few bytes behind.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const SAVED_KEY = 'vtw.saved.v1';
-const DISMISSED_KEY = 'vtw.dismissed.v1';
-
-// Dismissals fade out, otherwise the stack would eventually be empty forever with no way
-// back other than clearing site data.
-const DISMISSAL_TTL_MS = 14 * 86_400_000;
 
 const SavedEventsContext = createContext(null);
 
@@ -34,22 +35,12 @@ function writeJson(key, value) {
 const looksLikeEvent = (value) =>
   value && typeof value === 'object' && typeof value.id === 'string' && typeof value.name === 'string';
 
-function prunedDismissals(raw) {
-  if (!raw || typeof raw !== 'object') return {};
-  const cutoff = Date.now() - DISMISSAL_TTL_MS;
-  return Object.fromEntries(
-    Object.entries(raw).filter(([, at]) => typeof at === 'number' && at > cutoff),
-  );
-}
-
 const byStartTime = (a, b) => new Date(a.start_at) - new Date(b.start_at);
 
 export function SavedEventsProvider({ children }) {
   const [saved, setSaved] = useState(() => readJson(SAVED_KEY, []).filter(looksLikeEvent));
-  const [dismissed, setDismissed] = useState(() => prunedDismissals(readJson(DISMISSED_KEY, {})));
 
   useEffect(() => writeJson(SAVED_KEY, saved), [saved]);
-  useEffect(() => writeJson(DISMISSED_KEY, dismissed), [dismissed]);
 
   const save = useCallback((event) => {
     if (!looksLikeEvent(event)) return;
@@ -65,12 +56,6 @@ export function SavedEventsProvider({ children }) {
     setSaved((current) => current.filter((item) => item.id !== id));
   }, []);
 
-  const dismiss = useCallback((id) => {
-    setDismissed((current) => ({ ...current, [id]: Date.now() }));
-  }, []);
-
-  const resetDismissed = useCallback(() => setDismissed({}), []);
-
   const clearSaved = useCallback(() => setSaved([]), []);
 
   const value = useMemo(() => {
@@ -79,16 +64,12 @@ export function SavedEventsProvider({ children }) {
       // Chronological, because a saved list is really a plan for the weekend.
       saved: [...saved].sort(byStartTime),
       savedIds,
-      dismissedIds: new Set(Object.keys(dismissed)),
-      dismissedCount: Object.keys(dismissed).length,
       isSaved: (id) => savedIds.has(id),
       save,
       remove,
-      dismiss,
-      resetDismissed,
       clearSaved,
     };
-  }, [saved, dismissed, save, remove, dismiss, resetDismissed, clearSaved]);
+  }, [saved, save, remove, clearSaved]);
 
   return <SavedEventsContext.Provider value={value}>{children}</SavedEventsContext.Provider>;
 }

@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from .config import get_settings
 from .limiter import limiter
 from .proxy_guard import came_through_proxy
-from .routers import admin, events, interactions, share
+from .routers import admin, events, interactions, share, subscribers
 
 settings = get_settings()
 
@@ -87,6 +87,7 @@ app.add_middleware(
 app.include_router(events.router)
 app.include_router(share.router)
 app.include_router(interactions.router)
+app.include_router(subscribers.router)
 app.include_router(admin.router)
 
 

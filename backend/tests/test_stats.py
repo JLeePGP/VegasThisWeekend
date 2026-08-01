@@ -17,6 +17,17 @@ def post(client, items):
     return client.post("/interactions", json={"items": items})
 
 
+def record_legacy(db, metric, event_id=None, count=1):
+    """Write a counter the public endpoint no longer accepts.
+
+    `skip` and `stack_exhausted` were produced by the swipe deck. Production still holds
+    weeks of them, so the summary has to keep reading them even though nothing can write
+    one through the API any more — which is exactly what these rows are here to prove.
+    """
+    db.add(StatCounter(day=vegas_today(), metric=metric, event_id=event_id, count=count))
+    db.commit()
+
+
 class TestRecording:
     def test_records_a_site_wide_metric(self, client, db):
         assert post(client, [{"metric": "share_create"}]).status_code == 202
@@ -126,7 +137,7 @@ class TestRecording:
             post(
                 client,
                 [{"metric": "save", "event_id": e.id} for e in events]
-                + [{"metric": "skip", "event_id": e.id} for e in events]
+                + [{"metric": "detail_open", "event_id": e.id} for e in events]
                 + [{"metric": "share_create"}],
             )
         finally:
@@ -188,24 +199,36 @@ class TestSummary:
             [
                 {"metric": "save", "event_id": event.id},
                 {"metric": "save", "event_id": event.id},
-                {"metric": "skip", "event_id": event.id},
+                {"metric": "list_end"},
                 {"metric": "share_create"},
             ],
         )
-        assert summary(db)["totals"] == {"save": 2, "skip": 1, "share_create": 1}
+        assert summary(db)["totals"] == {"save": 2, "list_end": 1, "share_create": 1}
 
-    def test_save_rate_is_of_decisions_not_of_impressions(self, client, db):
-        """Ranking by raw saves ranks by how long a card sat near the top of the stack.
-        Save rate is what says whether people actually wanted it."""
+    def test_swipe_era_counters_are_still_reported(self, client, db):
+        """Weeks of `skip` and `stack_exhausted` rows exist in production. Dropping them
+        from the enum must not make them vanish from the dashboard."""
+        event = add_event(db)
+        post(client, [{"metric": "save", "event_id": event.id}])
+        record_legacy(db, "skip", event.id, count=3)
+        record_legacy(db, "stack_exhausted", count=7)
+
+        totals = summary(db)["totals"]
+        assert totals["skip"] == 3
+        assert totals["stack_exhausted"] == 7
+
+    def test_save_rate_uses_the_decisions_swipes_recorded(self, client, db):
+        """Save rate is only meaningful against an explicit no, which is what a swipe
+        left was. These are historical rows; nothing produces them now."""
         popular = add_event(db, name="Popular")
         seen_a_lot = add_event(db, name="Seen A Lot")
         post(
             client,
             [{"metric": "save", "event_id": popular.id}] * 3
-            + [{"metric": "skip", "event_id": popular.id}]
-            + [{"metric": "save", "event_id": seen_a_lot.id}] * 4
-            + [{"metric": "skip", "event_id": seen_a_lot.id}] * 16,
+            + [{"metric": "save", "event_id": seen_a_lot.id}] * 4,
         )
+        record_legacy(db, "skip", popular.id, count=1)
+        record_legacy(db, "skip", seen_a_lot.id, count=16)
 
         by_name = {e["name"]: e for e in summary(db)["events"]}
         assert by_name["Popular"]["save_rate"] == 0.75
@@ -217,6 +240,18 @@ class TestSummary:
         event = add_event(db)
         post(client, [{"metric": "detail_open", "event_id": event.id}])
         assert summary(db)["events"][0]["save_rate"] is None
+
+    def test_a_saved_event_with_no_skips_has_no_rate_rather_than_a_perfect_one(
+        self, client, db
+    ):
+        """The trap this guards: saves/(saves+0) is 1.0, so every event in the list era
+        would show a flawless save rate and the column would read as a measurement."""
+        event = add_event(db)
+        post(client, [{"metric": "save", "event_id": event.id}] * 4)
+
+        entry = summary(db)["events"][0]
+        assert entry["save_rate"] is None
+        assert entry["metrics"]["save"] == 4
 
     def test_events_are_ranked_by_saves(self, client, db):
         low = add_event(db, name="Low")
@@ -235,9 +270,10 @@ class TestSummary:
         post(
             client,
             [{"metric": "save", "event_id": a.id}]
-            + [{"metric": "save", "event_id": b.id}] * 2
-            + [{"metric": "skip", "event_id": c.id}],
+            + [{"metric": "save", "event_id": b.id}] * 2,
         )
+        record_legacy(db, "skip", c.id)
+
         result = summary(db)["by_vibe"]
         assert result["music"]["saves"] == 3
         assert result["shows"]["saves"] == 0

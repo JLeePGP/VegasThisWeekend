@@ -266,6 +266,36 @@ class InsiderTip(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_utcnow)
 
 
+class Subscriber(Base):
+    """A newsletter signup. The only personal data this project stores.
+
+    Everything else here is deliberately anonymous — no accounts, no cookies, counters
+    with no session or IP attached. An email address is none of those things, so the
+    exception is worth stating rather than letting it blend in: it is opt-in, it is the
+    only thing collected, and it exists because the newsletter is the surface the catalog
+    is meant to feed.
+
+    Nothing about the request that created the row is kept — no IP, no user agent. The
+    address itself is stored lowercased so the unique index actually prevents duplicates;
+    the local part is technically case-sensitive per RFC 5321, but no mail provider in
+    practice treats it that way, and two rows for the same person means mailing them
+    twice.
+
+    `source` says which surface converted, which is the only question worth asking of
+    this table beyond "who do I mail". It is not a tracking id.
+    """
+
+    __tablename__ = "subscribers"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_new_id)
+
+    # 254 is the maximum length of an address that can actually be delivered to.
+    email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True, index=True)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_utcnow)
+
+
 class ShareList(Base):
     """An anonymous, read-only snapshot of saved event ids.
 

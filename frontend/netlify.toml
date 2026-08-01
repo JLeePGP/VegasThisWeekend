@@ -5,7 +5,9 @@
 [build.environment]
   NODE_VERSION = "24"
 
-# Client-side routing: /s/<token> and /saved are React Router paths, not files.
+# Client-side routing: /saved, /s/<token> and /e/<id> are React Router paths, not files.
+# The event route matters most here — it is the one people paste to each other, so a
+# missing fallback would 404 exactly the links that travel.
 [[redirects]]
   from = "/*"
   to = "/index.html"
