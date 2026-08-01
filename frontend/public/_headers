@@ -63,6 +63,19 @@
 # is the correct outcome. If a whole page of cards goes blank, something stopped mirroring
 # — check the admin panel's media warning rather than reaching for this line.
 
+# Netlify serves .webmanifest as application/octet-stream, and this site sends
+# X-Content-Type-Options: nosniff — so the browser will not sniff its way to the right
+# type and simply refuses the manifest. The page looks perfect and the install prompt
+# never appears, with nothing logged anywhere obvious. Found by checking the deployed
+# headers; a local build cannot show it, because there are no headers in a build.
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600
+
+# The icon set changes only when the branding does.
+/icons/*
+  Cache-Control: public, max-age=604800
+
 # Hashed build assets are immutable; the HTML shell must never be cached.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
