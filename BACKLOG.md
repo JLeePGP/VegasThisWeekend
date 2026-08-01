@@ -4,6 +4,172 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
 ---
 
+## Session close — 31 Jul 2026
+
+**The swipe interaction is being removed.** That is the headline, and everything below
+follows from it. Read this section before planning anything.
+
+### What launch feedback actually said
+
+25 people commented. The signal was not ambiguous:
+
+- **8 of 25 asked for a list view, unprompted.** Very few liked the card stack. One was a
+  real Las Vegas friend, not an anonymous account.
+- **5 said they had built something similar and quit** — because sourcing and maintaining
+  curation over months got too hard. That is the failure mode of this whole category, and
+  it is a bigger threat to this project than any UI decision.
+- 2 asked for accounts. Deferred — see below.
+- People were drawn to **consolidation of events that are not the usual Strip hype**, not
+  to video, and not to the interaction. The catalog is the product.
+
+### Why swipe was wrong, beyond the vote count
+
+Swipe suits an effectively infinite pool where comparison does not matter. A weekend of
+events is a **finite, time-ordered, comparable set** — the real question is "what else is
+on at 9pm?", and a card stack physically prevents answering it.
+
+### Usage data behind these calls (30–31 Jul, 689 sessions)
+
+Two days, launch spike, includes John's own testing — directional only.
+
+| metric | count | per session |
+|---|---|---|
+| save | 517 | **0.75** |
+| detail_open | 231 | 0.34 |
+| stack_exhausted | 215 | **0.31** |
+| website_click | 83 | 0.12 |
+| ticket_click | 24 | **0.035** |
+| share_create | 3 | 0.004 |
+
+- **31% of sessions exhausted the catalog.** The thin catalog is measured, not assumed.
+- **Saving works** — keep it. It is the only interaction that survives the pivot.
+- **Sharing is dead.** "Choose which events to share" is cut from the roadmap, not
+  refined. 3 uses in 689 sessions.
+- **Ticket clicks are 3.5%, venue-site clicks are 3.5× higher.** People discover here and
+  transact elsewhere, which is why ticketing affiliate is not a viable path.
+
+### Update 1 — agreed scope
+
+List-only. This is a **deletion**, not another mode.
+
+- Remove `SwipeStack.jsx`, swipe gestures, the deck/queue model, dismissals, "That's
+  everything", the floating action row and the swipe hint
+- Single list view: day headers (weekday + date), chronological within each day
+- Rows carry **thumbnail, time, name, neighbourhood, price, save**. No hook — it read as
+  Eventbrite and the curation lives in *which* events are listed, not in row copy
+- Venue moves to the detail view; venue filtering comes later
+- Tap a row → detail. Details are the page; the **image** is a bounded hero
+- Video only via a **player button on the detail view**, opening full-screen at native
+  9:16. Never cropped, never a faded background, never in a row
+- **Email capture** at the end of the list and on the Saved screen
+- Date range filtering **not** in this update — existing today/weekend/all stays
+
+Two consequences of the pivot that are easy to miss:
+
+1. **The empty-deck overlap bug disappears on its own.** It was the action row covering
+   the empty state. No action row, no bug.
+2. **`_lead_event_id` in `routers/events.py` becomes wrong.** Promoting a video event out
+   of chronological order was right for a card stack; in a day-grouped list it breaks
+   both the grouping and the time ordering. Revert or gate it as part of Update 1.
+
+### Strategy — the app is the engine, the newsletter is the product
+
+Monetisation is the open question and the app monetises last. The reframe John landed on:
+
+**The catalog labour is identical whichever surface it feeds.** The app needs far more
+traffic before anything pays; a local newsletter monetises at audience sizes an app cannot
+touch, and it fixes retention — email arrives whether or not someone remembers the app.
+
+The loop that makes this defensible: structured catalog → drafted issue is a query, not
+research. Per-issue cost near zero is the direct counter to the thing that killed those
+five other projects.
+
+Decisions taken:
+
+- **Email before SMS.** SMS needs 10DLC carrier registration, costs per message, and
+  sponsors do not buy it. Revisit only for opt-in "tonight only" alerts.
+- **Audience is locals, not tourists.** Tourists churn 100%, which is fatal for a weekly.
+  "Not the same old Strip hype" was already written for locals.
+- **Let a thin week be a short issue.** Quota-driven padding is why curator newsletters
+  fall flat — three good things beats ten with seven fillers.
+- **Build no newsletter infrastructure.** Capture emails in the app, send from Beehiiv or
+  Buttondown's free tier, script a draft issue from the database. Six weekly issues, then
+  judge on open rate and replies.
+
+### Deferred, with reasons
+
+- **Accounts** — 2 of 25. Conflicts with the no-accounts/no-cookies stance. Note the real
+  problem may be storage durability, not a missing feature: saves live only in
+  localStorage and iOS evicts it after ~7 days of no visits. Cheaper rungs first: a PWA
+  manifest (there is none — someone already tried adding the site to their home screen by
+  hand), then Upcoming/Past grouping on Saved, then a recovery link. Accounts last.
+- **User-submitted events** — too much admin today, but it is the cheapest known attack on
+  the maintenance problem that killed the other five projects. Luma tolerates open
+  submission because events land on the submitter's own calendar; here a single curated
+  feed *is* the product, so submissions need triage. Lighter path: a public form that
+  feeds the existing `extraction_drafts` queue, so approving is clicks rather than
+  re-entry.
+- **Insider tips** — the venue-matching shape was wrong; tips are often event-specific.
+  Replace with a plain text field on the event, filled in during entry. Additive
+  migration. The `insider_tips` table (0 rows) can simply stop being used.
+- **Share selection** — cut outright, see the data above.
+- **Date range filter**, **venue filter**, **volume on video** — later, none urgent.
+
+### After Update 1: events, hard
+
+31% catalog exhaustion says sourcing is the binding constraint. No layout fixes a thin
+catalog. Extraction, bulk extraction and recurrence already exist and are the leverage —
+anything that lowers per-event cost is worth more than a feature.
+
+### What shipped this session
+
+| Commit | What |
+|---|---|
+| `236a4b1` | TikTok videos mirrored by downloading with yt-dlp, not by resolving a URL |
+| `0825619` | Feed leads with a video card, rotating by listing day — **now obsolete, see above** |
+| `d299820` | `img-src`/`media-src` narrowed to the R2 domain |
+| `bbbd21f` | Nightly database backup to a private R2 bucket |
+| `2ebfcb8` | Backup actions pinned to Node 24 majors |
+
+- **OPERATIONS §1 is complete.** R2 live, all 14 events serving both media fields from
+  `media.vegasthisweekend.com`, CSP tightened and verified at the edge. The site now
+  contacts zero third-party hosts.
+- **Backups exist for the first time.** Railway gates snapshots behind a paid plan, so
+  `scripts/export_data.py` writes every row to JSON nightly into `vtw-backups` (private,
+  separate token from the public media bucket). Verified by downloading and parsing a real
+  upload. It is a data export, not a `pg_dump` — restoring means migrating to the recorded
+  alembic revision and loading rows.
+- Still open in OPERATIONS: §2 Web Analytics toggle, §3 edge cache rule, §4 proxy secret
+  (most dangerous — do it in a quiet window, never alongside a feature ship).
+
+### Staging environment — new, use it
+
+| | |
+|---|---|
+| URL | https://staging--vegasthisweekend.netlify.app |
+| Branch | `staging` — Netlify branch deploys are enabled for it |
+| CORS | that origin is in Railway's `CORS_ORIGINS` |
+
+Two gotchas that already cost time:
+
+- **Netlify skips builds with no frontend change** (base directory is `frontend/`), and
+  reports it as "Canceled". A backend-only commit shows a cancelled deploy and that is
+  correct behaviour, not a failure.
+- **Per-PR deploy previews cannot work** — their URLs vary and CORS is exact-match, so
+  they are switched off deliberately. One long-lived `staging` branch is the sandbox.
+
+Staging runs against the **production API and database**. Share links created while
+testing are real rows, and test traffic nudges the real counters.
+
+### State at close
+
+- 323 backend tests passing; working tree clean
+- `main` at `2ebfcb8`, `staging` branched from it at `94dec78` (an empty commit)
+- 14 live events, 47 rows total. No sample data
+- Update 1 is agreed but **not started** — no frontend code has been written
+
+---
+
 ## Session close — 30 Jul 2026
 
 Session ended here. John moves to **adding events and finding users**; the build work
