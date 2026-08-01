@@ -109,11 +109,20 @@ export const listEvents = ({ q = '', includeInactive = true } = {}) => {
 export const createEvent = (payload, { force = false } = {}) =>
   request(`/admin/events${force ? '?force=true' : ''}`, { method: 'POST', body: payload });
 
-export const updateEvent = (id, payload) =>
-  request(`/admin/events/${id}`, { method: 'PUT', body: payload });
+/** `scope: 'series'` also applies the edit to every later night of the same run. The
+ *  default is this night only — a residency's nights are allowed to differ. */
+export const updateEvent = (id, payload, { scope = 'occurrence' } = {}) =>
+  request(`/admin/events/${id}?scope=${scope}`, { method: 'PUT', body: payload });
 
-export const deactivateEvent = (id) =>
-  request(`/admin/events/${id}/deactivate`, { method: 'POST' });
+export const deactivateEvent = (id, { scope = 'occurrence' } = {}) =>
+  request(`/admin/events/${id}/deactivate?scope=${scope}`, { method: 'POST' });
+
+/** The run this event belongs to, or — when it predates series ids — the nights it could
+ *  be linked with. Candidates are only ever offered, never linked automatically. */
+export const getSeries = (id) => request(`/admin/events/${id}/series`);
+
+export const linkSeries = (id, eventIds) =>
+  request(`/admin/events/${id}/series`, { method: 'POST', body: { event_ids: eventIds } });
 
 export const listTips = () => request('/admin/tips');
 export const createTip = (payload) => request('/admin/tips', { method: 'POST', body: payload });

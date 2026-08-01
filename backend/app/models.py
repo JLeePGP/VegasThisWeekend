@@ -92,6 +92,20 @@ class Event(Base):
     ticket_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Shared by every night generated from one recurrence, so a residency can be edited
+    # as the thing it is rather than row by row.
+    #
+    # Deliberately a plain grouping key and not a table. A series has no properties of
+    # its own — every night owns its name, price and description, and they are allowed
+    # to diverge, which is the whole reason occurrences are concrete rows in the first
+    # place. A parent row would invite the opposite assumption.
+    #
+    # Null for every event created before this existed and for every genuine one-off.
+    # Nothing infers it: rows are linked when John says they are a series, because
+    # "same name, same venue" is also what two separate runs of an annual event look
+    # like.
+    series_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+
     # Expired events are flagged inactive, never deleted.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # True for seeded placeholder data. Drives the "sample data" banner in the UI so

@@ -124,6 +124,9 @@ class AdminEventOut(BaseModel):
     source_url: str | None
     is_active: bool
     is_sample: bool
+    # Shared by every night of a residency. Null for a one-off, and for anything created
+    # before series existed.
+    series_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -152,6 +155,7 @@ class AdminEventOut(BaseModel):
             source_url=event.source_url,
             is_active=event.is_active,
             is_sample=event.is_sample,
+            series_id=event.series_id,
             created_at=event.created_at,
             updated_at=event.updated_at,
         )
@@ -202,6 +206,10 @@ class EventUpdateOut(AdminEventOut, MediaMirrorResult):
     fields would always read "not mirrored, no warning", which looks like a statement
     about the event and is really just "this response was not a write".
     """
+
+    # How many nights the edit actually reached, so the panel can say "updated 12 nights"
+    # rather than leaving John to trust that a series edit did what he asked.
+    applied_to: int = 1
 
 
 class ExtractIn(BaseModel):

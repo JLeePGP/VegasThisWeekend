@@ -4,6 +4,7 @@ import {
   API_BASE,
   ApiError,
   createEvent,
+  getSeries,
   getStatus,
   markExtractionApproved,
   readToken,
@@ -16,6 +17,7 @@ import EventForm from './components/EventForm';
 import EventList from './components/EventList';
 import BulkPanel from './components/BulkPanel';
 import ExtractPanel from './components/ExtractPanel';
+import SeriesNotice from './components/SeriesNotice';
 import StatsPanel from './components/StatsPanel';
 import SubscribersPanel from './components/SubscribersPanel';
 import TipsPanel from './components/TipsPanel';
@@ -77,6 +79,9 @@ export default function App() {
   const [recurrence, setRecurrence] = useState(BLANK_RECURRENCE);
   const [uncertain, setUncertain] = useState(new Set());
   const [editing, setEditing] = useState(null);
+  // The run the event being edited belongs to, and whether this save reaches it.
+  const [series, setSeries] = useState(null);
+  const [scope, setScope] = useState('occurrence');
   // The queue row the form was loaded from, so saving can mark it done. Null for
   // manual entry and for single-URL extraction.
   const [queuedDraft, setQueuedDraft] = useState(null);
@@ -214,6 +219,14 @@ export default function App() {
     setSaved(null);
     setSaveError(null);
     setTab('add');
+
+    // Reset to "this night only" on every edit. A scope that persisted from the last
+    // event would be the perfect way to rewrite a residency by accident.
+    setScope('occurrence');
+    setSeries(null);
+    getSeries(event.id)
+      .then(setSeries)
+      .catch(() => setSeries(null)); // Not fatal — the edit still works night by night.
   }
 
   async function save({ force = false } = {}) {
@@ -226,9 +239,12 @@ export default function App() {
         // The edit path mirrors media too, so it reports the same warning a create does.
         // It used to throw the result away, which meant adding a video that failed to
         // copy looked exactly like one that worked.
-        const updated = await updateEvent(editing.id, payload);
+        const updated = await updateEvent(editing.id, payload, { scope });
         setSaved({
-          message: `Updated "${payload.name}".`,
+          message:
+            updated.applied_to > 1
+              ? `Updated ${updated.applied_to} nights of "${payload.name}".`
+              : `Updated "${payload.name}".`,
           warning: updated.media_warning,
         });
       } else {
@@ -374,6 +390,16 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            {editing && (
+              <SeriesNotice
+                eventId={editing.id}
+                series={series}
+                scope={scope}
+                onScopeChange={setScope}
+                onLinked={setSeries}
+              />
+            )}
 
             {saveError && (
               <div className="banner" data-tone="error">

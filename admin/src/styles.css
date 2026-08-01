@@ -350,10 +350,48 @@ textarea {
   border-radius: 999px;
 }
 
-.chip[aria-pressed='true'] {
+/* `aria-checked` as well as `aria-pressed`: a mutually-exclusive choice is a radio group,
+   not a row of independent toggles, and the two spell "on" differently. */
+.chip[aria-pressed='true'],
+.chip[aria-checked='true'] {
   color: var(--text-hi);
   background: rgba(255, 46, 136, 0.16);
   border-color: var(--pink);
+}
+
+.chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- series notice */
+
+/* Sits above the edit form when the event is one night of a run. Cyan rather than the
+   pink used for warnings — it is information about what you are editing, not a problem. */
+.notice {
+  margin-bottom: 14px;
+  padding: 12px;
+  font-size: 13px;
+  background: rgba(46, 230, 224, 0.07);
+  border: 1px solid rgba(46, 230, 224, 0.28);
+  border-radius: 8px;
+}
+
+.notice strong {
+  display: block;
+  color: var(--text-hi);
+}
+
+.notice p {
+  margin-top: 6px;
+}
+
+.notice .chip-row {
+  margin-top: 10px;
+}
+
+.notice .btn {
+  margin-top: 10px;
 }
 
 /* ---------------------------------------------------------------- banners */

@@ -12,7 +12,9 @@ event in front of users on its own.
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime, time, timedelta
+from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -57,12 +59,46 @@ from ..schemas_admin import (
     TipWriteIn,
     to_local_string,
 )
-from ..timewindow import now_utc, vegas_local_to_utc
+from ..timewindow import VEGAS_TZ, now_utc, vegas_local_to_utc
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 settings = get_settings()
 
 ID_PATTERN = r"^[0-9a-f]{32}$"
+
+
+class EditScope(str, Enum):
+    """Which nights an edit reaches.
+
+    `OCCURRENCE` is the default everywhere, deliberately. Editing one night and silently
+    rewriting twenty-five others is the kind of thing you only find out about from a
+    visitor, and a residency's nights are allowed to differ — that is why they are rows.
+    """
+
+    OCCURRENCE = "occurrence"
+    SERIES = "series"
+
+
+def _future_series_rows(db: Session, row: Event) -> list[Event]:
+    """The other nights of `row`'s series that have not happened yet.
+
+    Past nights are never included. A series edit is "from here on" — rewriting a night
+    that already happened changes what people were told after the fact, and the counters
+    attached to it stop meaning anything.
+    """
+    if row.series_id is None:
+        return []
+    return list(
+        db.scalars(
+            select(Event)
+            .where(
+                Event.series_id == row.series_id,
+                Event.id != row.id,
+                Event.start_at > now_utc(),
+            )
+            .order_by(Event.start_at.asc())
+        ).all()
+    )
 
 # Applied when a source gives a start time but no end.
 DEFAULT_DURATION = timedelta(hours=3)
@@ -316,8 +352,15 @@ def create_events(
 
     image_url, video_url, mirrored, warning = _resolve_media(payload)
 
+    # One key across the whole batch, so these nights can later be edited as the residency
+    # they are. Only for a real series: a single row with a recurrence that produced one
+    # date is a one-off, and giving it a series id would offer John a "this and later
+    # nights" choice over an audience of one.
+    series_id = uuid.uuid4().hex if len(occurrences) > 1 else None
+
     created = [
         Event(
+            series_id=series_id,
             name=payload.name,
             venue=payload.venue,
             neighborhood=payload.neighborhood,
@@ -358,6 +401,10 @@ def replace_event(
     request: Request,
     payload: EventWriteIn,
     event_id: str = Path(pattern=ID_PATTERN),
+    scope: EditScope = Query(
+        EditScope.OCCURRENCE,
+        description="`occurrence` edits this night only; `series` also applies to every later night.",
+    ),
     db: Session = Depends(get_db),
 ) -> EventUpdateOut:
     row = db.get(Event, event_id)
@@ -366,7 +413,15 @@ def replace_event(
     if payload.recurrence is not None:
         raise HTTPException(
             status_code=422,
-            detail="A series is generated once on create; edit each night individually.",
+            detail=(
+                "A series is generated once on create. To change every night, edit one "
+                "of them with scope=series."
+            ),
+        )
+    if scope is EditScope.SERIES and row.series_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="This event is not part of a series. Link its nights first.",
         )
 
     # An edit is the other way an unmirrored third-party URL gets onto a card, and it
@@ -397,12 +452,49 @@ def replace_event(
     # Editing a sample event makes it real; that is how the banner clears itself.
     row.is_sample = False
 
+    applied_to = 1
+    if scope is EditScope.SERIES:
+        # What propagates is the time of day and the duration, never the date. Moving one
+        # night of a residency to a different day is a change to that night; moving the
+        # whole run from 10pm to 9pm is a change to the residency. Copying `start_at`
+        # across would collapse every night onto one date, which is the obvious
+        # implementation and is wrong in a way that is very hard to undo.
+        start_time = payload.starts_at_local.time()
+        duration = payload.ends_at_local - payload.starts_at_local
+
+        for sibling in _future_series_rows(db, row):
+            local_start = datetime.combine(
+                sibling.start_at.astimezone(VEGAS_TZ).date(), start_time
+            )
+            sibling.start_at = vegas_local_to_utc(local_start)
+            sibling.end_at = vegas_local_to_utc(local_start + duration)
+
+            sibling.name = payload.name
+            sibling.venue = payload.venue
+            sibling.neighborhood = payload.neighborhood
+            sibling.address = payload.address
+            sibling.vibe = payload.vibe.value
+            sibling.alcohol_free = payload.alcohol_free
+            sibling.tags = _tag_rows(payload)
+            sibling.price_tier = payload.price_tier.value
+            sibling.price_note = payload.price_note
+            sibling.hook = payload.hook
+            sibling.description = payload.description
+            sibling.image_url = image_url
+            sibling.video_url = video_url
+            sibling.ticket_url = payload.ticket_url
+            sibling.source_url = payload.source_url
+            sibling.is_active = payload.is_active
+            sibling.is_sample = False
+            applied_to += 1
+
     db.commit()
     cache.invalidate()
     return EventUpdateOut(
         **AdminEventOut.from_event(row).model_dump(),
         media_mirrored=mirrored,
         media_warning=warning,
+        applied_to=applied_to,
     )
 
 
@@ -411,16 +503,165 @@ def replace_event(
 def deactivate_event(
     request: Request,
     event_id: str = Path(pattern=ID_PATTERN),
+    scope: EditScope = Query(
+        EditScope.OCCURRENCE,
+        description="`series` also pulls every later night of the same run.",
+    ),
     db: Session = Depends(get_db),
 ) -> AdminEventOut:
-    """Pull an event from the stack. Events are flagged, never deleted."""
+    """Pull an event from the listing. Events are flagged, never deleted.
+
+    `scope=series` is how a residency that has been cancelled comes down in one action
+    instead of twenty-six. Nights already past are left alone — they are the record of
+    what was on, and hiding them retroactively would not un-tell anybody.
+    """
     row = db.get(Event, event_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Event not found.")
     row.is_active = False
+    if scope is EditScope.SERIES:
+        for sibling in _future_series_rows(db, row):
+            sibling.is_active = False
     db.commit()
     cache.invalidate()
     return AdminEventOut.from_event(row)
+
+
+# ------------------------------------------------------------------ series
+
+
+class SeriesNightOut(BaseModel):
+    id: str
+    starts_at_local: str
+    is_active: bool
+    is_past: bool
+
+
+class SeriesOut(BaseModel):
+    """What the panel needs to talk about a run of nights.
+
+    `nights` is empty and `candidates` populated for a run that predates series ids —
+    which is every event entered before 1 Aug 2026, including a real three-night run in
+    production. That is the case linking exists for.
+    """
+
+    series_id: str | None
+    nights: list[SeriesNightOut]
+    future_count: int
+    candidates: list[SeriesNightOut]
+
+
+def _as_night(row: Event, now: datetime) -> SeriesNightOut:
+    return SeriesNightOut(
+        id=row.id,
+        starts_at_local=to_local_string(row.start_at),
+        is_active=row.is_active,
+        is_past=row.start_at <= now,
+    )
+
+
+@router.get("/events/{event_id}/series", response_model=SeriesOut)
+@limiter.limit("30/minute")
+def read_series(
+    request: Request,
+    event_id: str = Path(pattern=ID_PATTERN),
+    db: Session = Depends(get_db),
+) -> SeriesOut:
+    """This event's series, or what one could be built from.
+
+    Candidates are matched on name and venue and are only ever *offered*. The panel shows
+    the dates and John confirms, because "same name at the same venue" is equally what two
+    separate runs of an annual event look like — and nothing here should decide that on
+    its own.
+    """
+    row = db.get(Event, event_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Event not found.")
+
+    now = now_utc()
+
+    nights: list[Event] = []
+    if row.series_id is not None:
+        nights = list(
+            db.scalars(
+                select(Event)
+                .where(Event.series_id == row.series_id)
+                .order_by(Event.start_at.asc())
+            ).all()
+        )
+
+    candidates: list[Event] = []
+    if row.series_id is None:
+        candidates = list(
+            db.scalars(
+                select(Event)
+                .where(
+                    Event.name == row.name,
+                    Event.venue == row.venue,
+                    Event.series_id.is_(None),
+                    Event.id != row.id,
+                )
+                .order_by(Event.start_at.asc())
+            ).all()
+        )
+
+    return SeriesOut(
+        series_id=row.series_id,
+        nights=[_as_night(night, now) for night in nights],
+        future_count=sum(1 for night in nights if night.start_at > now),
+        candidates=[_as_night(night, now) for night in candidates],
+    )
+
+
+class LinkSeriesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Named explicitly rather than "link everything that matches": the panel has already
+    # shown John these dates, and sending the ids back is what makes this his decision
+    # rather than a query's.
+    event_ids: list[str] = Field(min_length=1, max_length=52)
+
+
+@router.post("/events/{event_id}/series", response_model=SeriesOut)
+@limiter.limit("20/minute")
+def link_series(
+    request: Request,
+    payload: LinkSeriesIn,
+    event_id: str = Path(pattern=ID_PATTERN),
+    db: Session = Depends(get_db),
+) -> SeriesOut:
+    """Group existing rows into a series.
+
+    Exists because series ids arrived after the events did. Rows already belonging to a
+    different series are refused rather than moved — silently pulling a night out of one
+    run and into another is not something a click should be able to do.
+    """
+    row = db.get(Event, event_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Event not found.")
+
+    rows = list(db.scalars(select(Event).where(Event.id.in_(payload.event_ids))).all())
+    if len(rows) != len(set(payload.event_ids)):
+        raise HTTPException(status_code=404, detail="One of those events no longer exists.")
+
+    members = [row, *(item for item in rows if item.id != row.id)]
+
+    existing = {item.series_id for item in members if item.series_id is not None}
+    if len(existing) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Those nights already belong to different series.",
+        )
+
+    # Reuse the series id if one of them already has it, so linking a stray night into an
+    # existing run does not renumber the run.
+    series_id = existing.pop() if existing else uuid.uuid4().hex
+    for item in members:
+        item.series_id = series_id
+
+    db.commit()
+    cache.invalidate()
+    return read_series(request=request, event_id=row.id, db=db)
 
 
 # ------------------------------------------------------------------ diagnostics
