@@ -30,9 +30,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      # All three actions pinned to majors that declare `runs.using: node24`. The v4/v5
+      # generation still worked, but only because the runner force-ran them on Node 24
+      # while warning — and that fallback is what eventually gets removed.
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -57,7 +60,7 @@ jobs:
         # A second place to find last night's data, and the thing that makes a failure
         # visible: an artifact that is missing or 0 bytes is obvious in the UI, whereas a
         # bucket nobody opens is not.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vtw-backup
           path: ${{ runner.temp }}/backup/*.json
