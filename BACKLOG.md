@@ -63,7 +63,7 @@ newsletter is already that.
 | Provider | ⬜ **Buttondown** recommended — usable free tier, plain-text friendly, no growth cruft |
 | Mailing address | ⬜ **CAN-SPAM requires a physical address in every issue.** PO box or virtual mailbox; has a real-world lead time |
 | Draft script | ⬜ query the week's events → markdown issue. This is the loop that makes per-issue cost near zero |
-| Cadence | Thursday, per the copy already in the app |
+| Cadence | Weekly, day not yet committed — **the app deliberately promises no day and no first-issue date**, so waiting for signups costs nothing |
 
 **The export discipline, and why the tab works the way it does.** Unsubscribes live with
 the provider; this table never hears about them. Exporting the whole list a second time

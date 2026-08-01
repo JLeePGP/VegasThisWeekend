@@ -13,14 +13,21 @@ import { subscribe } from '../api';
 // for that. No pre-ticked anything, no interstitial, and it sits at the end of the list
 // where someone has already seen what the app does, rather than in front of it.
 
+// Deliberately promises no day and no first-issue date.
+//
+// The first version said "every Thursday" and "first issue lands Thursday", which is a
+// dated commitment made to whoever signs up first — and the first signups are the people
+// most likely to notice it going unmet. Nobody signing up is counting on a particular
+// Thursday; they are counting on the thing being good when it arrives. Say what it is,
+// not when, until there is a list worth sending to and an issue ready to send.
 const COPY = {
   list_end: {
     title: 'That’s everything on right now',
-    body: 'Get the week’s picks by email every Thursday — the things worth leaving the house for, not the same Strip listings.',
+    body: 'Get the week’s picks by email — the things worth leaving the house for, not the same Strip listings.',
   },
   saved: {
     title: 'Keep the good ones coming',
-    body: 'A short email every Thursday with the week’s picks. Your saved list stays on this device either way.',
+    body: 'A short weekly email with the week’s picks. Your saved list stays on this device either way.',
   },
 };
 
@@ -54,7 +61,7 @@ export default function EmailCapture({ source }) {
       <section className="signup signup--done">
         <p className="signup__title">You’re on the list</p>
         <p className="signup__body">
-          First issue lands Thursday. Nothing else is sent to this address.
+          You’ll get the first issue soon. Nothing else is sent to this address.
         </p>
       </section>
     );
@@ -100,8 +107,10 @@ export default function EmailCapture({ source }) {
           </p>
         )}
 
+        {/* "At most" rather than "one email a week": a cap cannot be broken by a quiet
+            week, where a promised frequency can. */}
         <p className="signup__note" id={`signup-note-${source}`}>
-          One email a week. No account, no tracking, unsubscribe any time.
+          At most one email a week. No account, no tracking, unsubscribe any time.
         </p>
       </form>
     </section>
