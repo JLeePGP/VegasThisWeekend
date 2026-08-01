@@ -16,16 +16,20 @@ share by link. No accounts, no cookies, free in v1. Owner: John (GitHub: JLeePGP
 ## Status as of 1 Aug 2026
 
 **Live and working.** Site `https://vegasthisweekend.com`, API
-`https://api.vegasthisweekend.com`, 14 real events, 342 tests passing.
+`https://api.vegasthisweekend.com`, ~12 real events, 400 tests passing, CI on every push.
 
 **The swipe deck is gone.** Update 1 replaced it with a day-grouped list after launch
 feedback — 8 of 25 people asked for a list unprompted. If you find a reference to swiping,
 a card stack, dismissals or `stack_exhausted` anywhere, it is stale and should be fixed
 rather than followed. `BACKLOG.md` carries the reasoning.
 
-**Build work is active.** After Update 1 the priority is events, not features: 31% of
-sessions reached the end of the catalog, so sourcing is the binding constraint and no
-layout change improves it.
+**Also shipped 1 Aug:** newsletter capture and an admin Newsletter tab, series editing,
+recurrence patterns beyond weekly, per-event share previews via a Netlify edge function,
+and the app is installable to the home screen.
+
+**Build work is active**, but sourcing is the binding constraint: 31% of sessions reached
+the end of the catalog, and no layout change improves that. Read the session-close entry
+at the top of `BACKLOG.md` before planning anything.
 
 Five things are built but switched off, all needing dashboard access John has and you
 don't: R2 credentials, the Cloudflare cache rule, the Web Analytics toggle, the proxy

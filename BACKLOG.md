@@ -4,6 +4,77 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
 ---
 
+## Session close — 1 Aug 2026
+
+Eleven commits, all on `main` and `staging` (both at `0e93179`), all deployed and verified
+in production. 400 backend tests passing, CI green.
+
+### What shipped
+
+| Commit | What |
+|---|---|
+| `cb3523c` | **Update 1** — the swipe deck deleted, day-grouped list, `/e/<id>` detail route, video behind a play button, newsletter capture |
+| `a0e1a9f` | **Newsletter tab** in the admin panel — windowed export, masked addresses, remove |
+| `676f240` | Signup copy stopped promising a specific Thursday |
+| `1ec27b2` | **CI** — tests and both builds on every push. Also dropped `react-swipeable` |
+| `272d29d` | **Series editing** — a residency edits as a run, not twenty-six times |
+| `355e2c1` | **Recurrence patterns** — every N weeks, and nth weekday of the month |
+| `9f57a1b` | **Per-event share previews** via a Netlify edge function |
+| `6bb7612`, `d9655de` | **Installable to the home screen** — manifest, icons, and the content-type fix that made it actually work |
+| `0e93179` | **Installed-usage counters** — `standalone_session` and Android-only `app_installed` |
+
+### Two things in production that are not real data
+
+- **`deploy-probe@example.com` is in `subscribers`.** It came from verifying the endpoint.
+  Remove it from the Newsletter tab before the first export.
+- **A handful of `standalone_session` and `app_installed` counters came from curl**, not
+  people — two of each, on 1 Aug. Discount them when reading the first day.
+
+### Where to pick up
+
+**The next build decision is open, and the data should settle it.** Two candidates:
+
+1. **Desktop layout** — M. There are still zero layout media queries, so it is additive:
+   the `100dvh` shell becomes document scroll, `TabBar` becomes header nav, filters become
+   a sidebar, detail goes two-column.
+2. **Saved durability** — Upcoming/Past grouping on Saved, then a recovery link. S each.
+
+The tiebreaker is the **From the home screen** tile in Admin → Stats. Installing is a
+minority behaviour — John had never done it himself — so if that number sits near 1% in a
+month, the PWA fixed durability only for a handful of people and the rungs in (2) are what
+address it for everyone else. If it is 10%, installed users are a real segment worth
+building for. Give it a few weeks of real traffic first.
+
+### Parked, with the trigger written down
+
+- **Newsletter** — mailing address (CAN-SPAM needs a physical one; PO box has a lead
+  time), Buttondown account, draft-issue script. Trigger: roughly 8–10 signups out of the
+  25 launch replies. The app promises no send date, so waiting costs nothing.
+- **Sourcing** — John's, ongoing, and the binding constraint. Recurring events first:
+  first-Friday, last-Thursday and fortnightly runs are now one entry each.
+
+### Still John's, still open since 30 Jul
+
+OPERATIONS **§2** Web Analytics toggle · **§3** edge cache rule — `cf-cache-status` still
+reads `DYNAMIC`, so the API's caching headers are being ignored entirely · **§4** proxy
+shared secret, quiet window only, never alongside a ship.
+
+### Worth knowing next session
+
+- **Staging first for anything infrastructural.** The edge function and the PWA both went
+  through `staging--vegasthisweekend.netlify.app` before `main`. Staging runs against the
+  **production** API, so a frontend change that needs new backend behaviour cannot be
+  fully tested there — that is why the installed-usage counters went straight to `main`
+  once verified locally.
+- **A 200 from Netlify proves nothing.** The SPA fallback returns 200 for every path, so
+  a readiness check that polls for 200 exits immediately against the old deploy. Poll for
+  content that only the new build contains.
+- **Check deployed headers, not the build.** The manifest deployed perfectly and was
+  refused by every browser, because Netlify served `.webmanifest` as
+  `application/octet-stream` under `nosniff`. A local build cannot show that.
+
+---
+
 ## Priority order — agreed 1 Aug 2026
 
 The newsletter is the top priority; sourcing is the constraint underneath everything.
