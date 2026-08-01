@@ -1,0 +1,65 @@
+# Nightly database backup.
+#
+# Railway gates scheduled snapshots behind a paid plan, so this is the backup. It exports
+# every row to JSON and puts it in a private R2 bucket — separate from the public media
+# bucket, which is served at media.vegasthisweekend.com and must never hold a database
+# export.
+#
+# The events are entered by hand and cannot be regenerated, which is the whole reason this
+# runs without being asked. A failed run emails the repo owner; do not ignore that mail —
+# a backup job that has been quietly failing is indistinguishable from no backup at all.
+
+name: Nightly backup
+
+on:
+  schedule:
+    # 11:00 UTC — 04:00 in Las Vegas on daylight time, 03:00 on standard. Chosen to sit
+    # after the busiest hours and well clear of the 05:00 listing-day rollover.
+    - cron: "0 11 * * *"
+  # Lets you take one on demand after a big entry session, from the Actions tab.
+  workflow_dispatch:
+
+concurrency:
+  # Two exports at once would both succeed and one would be pointless.
+  group: nightly-backup
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the two libraries the exporter needs
+        # Not the full requirements.txt: this script needs a database driver and an S3
+        # client, and installing FastAPI to take a backup would only add ways to fail.
+        run: pip install "psycopg[binary]>=3.2" "boto3>=1.40"
+
+      - name: Export and upload
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+        run: |
+          python backend/scripts/export_data.py \
+            --upload-r2 \
+            --out-dir "${RUNNER_TEMP}/backup"
+
+      - name: Keep a copy on the run itself
+        # A second place to find last night's data, and the thing that makes a failure
+        # visible: an artifact that is missing or 0 bytes is obvious in the UI, whereas a
+        # bucket nobody opens is not.
+        uses: actions/upload-artifact@v4
+        with:
+          name: vtw-backup
+          path: ${{ runner.temp }}/backup/*.json
+          retention-days: 14
+          if-no-files-found: error
