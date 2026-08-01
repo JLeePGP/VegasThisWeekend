@@ -10,7 +10,7 @@
     <title>Vegas This Weekend</title>
     <meta
       name="description"
-      content="Swipe through what's happening in Las Vegas this weekend. Save what looks good, share it with your group. No account needed."
+      content="What's on in Las Vegas this weekend, listed by day. Save what looks good, share it with your group. No account needed."
     />
     <link rel="canonical" href="https://vegasthisweekend.com/" />
 
@@ -24,12 +24,18 @@
       The ?v= is a cache-buster. Those scrapers cache a preview per URL for days, so if
       you regenerate the card (npm run og), bump this number or the old image keeps
       being served.
+
+      These are the defaults, and /e/<id> does not serve them: an edge function rewrites
+      the title, description, url and image per event before a scraper sees them. See
+      netlify/edge-functions/event-meta.js. It matches on the property attribute rather
+      than the whole tag, so reformatting below is safe — but removing a tag outright
+      makes it silently skip that one.
     -->
     <meta property="og:site_name" content="Vegas This Weekend" />
     <meta property="og:title" content="Vegas This Weekend" />
     <meta
       property="og:description"
-      content="Swipe through what's on in Las Vegas this weekend. Save what looks good, send it to your group."
+      content="What's on in Las Vegas this weekend, listed by day. Save what looks good, send it to your group."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://vegasthisweekend.com/" />
@@ -39,14 +45,14 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Vegas This Weekend — swipe through what's on, save what looks good, send it to your group."
+      content="Vegas This Weekend — what's on, listed by day. Save what looks good, send it to your group."
     />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Vegas This Weekend" />
     <meta
       name="twitter:description"
-      content="Swipe through what's on in Las Vegas this weekend. Save what looks good, send it to your group."
+      content="What's on in Las Vegas this weekend, listed by day. Save what looks good, send it to your group."
     />
     <meta name="twitter:image" content="https://vegasthisweekend.com/og-image.jpg?v=1" />
 

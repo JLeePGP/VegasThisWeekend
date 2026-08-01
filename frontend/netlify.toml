@@ -12,3 +12,13 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Per-event share previews. Declared here as well as in the function's own `config`
+# export so the routing is visible in the place someone looks for routing.
+#
+# It runs before the fallback above, so `context.next()` inside it returns the built
+# index.html and the function substitutes the <head> into it. Everything about the SPA is
+# unchanged — this only affects the markup a scraper reads before any JavaScript runs.
+[[edge_functions]]
+  path = "/e/*"
+  function = "event-meta"
