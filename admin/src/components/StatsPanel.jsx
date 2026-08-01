@@ -243,6 +243,17 @@ export default function StatsPanel() {
 
       <div className="tiles">
         <Tile label="Visits" value={num(t.session_start)} />
+        {/* The share, not the count, because the count alone says nothing without the
+            denominator sitting next to it. */}
+        <Tile
+          label="From the home screen"
+          value={
+            t.session_start
+              ? `${Math.round(((t.standalone_session ?? 0) / t.session_start) * 100)}%`
+              : '—'
+          }
+          hint={`${num(t.standalone_session)} of ${num(t.session_start)} visits`}
+        />
         <Tile label="Saves" value={num(t.save)} />
         <Tile label="Signups" value={num(t.subscribe)} hint="newsletter" />
         {hasSwipeEra && (
@@ -276,6 +287,11 @@ export default function StatsPanel() {
           value={num(t.list_end)}
           hint="catalog too thin"
         />
+        <Tile
+          label="Installs"
+          value={num(t.app_installed)}
+          hint="Android only — see below"
+        />
         {hasSwipeEra && (
           <Tile
             label="Ran out of cards"
@@ -284,6 +300,16 @@ export default function StatsPanel() {
           />
         )}
       </div>
+
+      <p className="muted stats__note">
+        <strong>Installs undercount, permanently.</strong> Safari fires no install event
+        of any kind, so an iPhone user adding this to their home screen is invisible —
+        that tile is Android and desktop Chrome only, and a low number is not evidence
+        that nobody installs. <strong>From the home screen</strong> is the one to watch
+        instead: it counts visits that arrived through an installed icon, works on both
+        platforms, and answers the question installing was for — whether those people
+        come back, and whether their saved events survive.
+      </p>
 
       <section className="stats__section">
         <h3>Saves and skips per day</h3>

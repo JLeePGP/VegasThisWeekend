@@ -126,5 +126,40 @@ export const trackSubscribe = () => push('subscribe');
 /** One per page load, as the denominator for everything above. */
 export const trackSessionStart = () => push('session_start');
 
+/**
+ * True when this page is running as an installed app rather than in a browser tab.
+ *
+ * Two checks because the platforms disagree. `display-mode` is the standard and is what
+ * Android reports; `navigator.standalone` is Safari's own flag and is what iOS home
+ * screen apps have had for years. Either one being true is enough.
+ */
+export function isStandalone() {
+  try {
+    return (
+      window.matchMedia?.('(display-mode: standalone)').matches === true ||
+      window.navigator.standalone === true
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A session opened from the home screen.
+ *
+ * Deliberately counted per session rather than per install. Safari fires no install
+ * event of any kind — an iPhone user adding this to their home screen is invisible — so
+ * an install counter would be Android-only and would read as "nobody installs" for an
+ * audience that is mostly iPhone.
+ *
+ * Read against `session_start` it answers the question the install was for: do people
+ * who install come back, and does saving survive for them. An install nobody opens is
+ * worth nothing, and this counts the opening.
+ */
+export const trackStandaloneSession = () => push('standalone_session');
+
+/** Chromium's `appinstalled`. Android and desktop Chrome only — see above. */
+export const trackAppInstalled = () => push('app_installed');
+
 // Exported for tests; not part of the normal surface.
 export const __flush = flush;

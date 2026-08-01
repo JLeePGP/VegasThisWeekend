@@ -313,3 +313,30 @@ class TestAdminEndpoint:
     def test_day_window_is_bounded(self, admin_client):
         assert admin_client.get("/admin/stats", params={"days": 0}).status_code == 422
         assert admin_client.get("/admin/stats", params={"days": 400}).status_code == 422
+
+
+class TestInstalledUsage:
+    """Counted per session rather than per install, because Safari reports installs to
+    nobody. See the note on Metric.STANDALONE_SESSION."""
+
+    def test_a_standalone_session_is_recorded(self, client, db):
+        post(client, [{"metric": "session_start"}, {"metric": "standalone_session"}])
+        totals = summary(db)["totals"]
+        assert totals == {"session_start": 1, "standalone_session": 1}
+
+    def test_it_adds_to_the_visit_count_rather_than_replacing_it(self, client, db):
+        """The share is a ratio of session_start, so a standalone visit has to appear in
+        both. Firing it instead would make the denominator shrink as installs grew."""
+        post(client, [{"metric": "session_start"}, {"metric": "standalone_session"}])
+        post(client, [{"metric": "session_start"}])
+
+        totals = summary(db)["totals"]
+        assert totals["session_start"] == 2
+        assert totals["standalone_session"] == 1
+
+    def test_an_install_is_site_wide_not_per_event(self, client, db):
+        post(client, [{"metric": "app_installed"}])
+        assert db.query(StatCounter).one().event_id is None
+
+    def test_both_are_a_closed_vocabulary(self, client):
+        assert post(client, [{"metric": "standalone_sessions"}]).status_code == 422

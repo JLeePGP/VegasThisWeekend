@@ -64,6 +64,15 @@ class Metric(str, Enum):
     LIST_END = "list_end"
     SUBSCRIBE = "subscribe"
     SESSION_START = "session_start"
+    # Launched from the home screen rather than a browser tab. Counted per session
+    # rather than per install, because Safari reports installs to nobody — an install
+    # counter would be Android-only and read as "nobody installs" when the audience is
+    # mostly iPhone. Installed *usage* is also the better question: an install nobody
+    # opens is worth nothing.
+    STANDALONE_SESSION = "standalone_session"
+    # Chromium's `appinstalled` event. Android and desktop Chrome only, by construction —
+    # see the note above before reading anything into its size.
+    APP_INSTALLED = "app_installed"
 
     @property
     def is_per_event(self) -> bool:
