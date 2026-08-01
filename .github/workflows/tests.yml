@@ -1,0 +1,88 @@
+# Tests, on every push.
+#
+# Railway deploys `main` automatically, so until this existed the only thing standing
+# between a broken commit and production was remembering to run pytest locally. That held
+# while the repo was quiet; it stopped being a reasonable bet on 1 Aug 2026, when three
+# pushes to main deployed three times in one session.
+#
+# This does not gate the deploy — Railway and Netlify react to the push, not to this
+# workflow, and wiring a real gate means a deploy hook rather than a green tick. What it
+# does give you is a red X on the commit that broke it, in the minute after it happened
+# rather than the next time someone runs the suite by hand.
+#
+# No secrets are used and none should be added. The tests run against a temporary SQLite
+# database and every network-touching path is patched (see tests/conftest.py, which forces
+# ANTHROPIC_API_KEY and the R2 variables empty precisely so a real key in an environment
+# cannot make a live, billable call).
+
+name: Tests
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A second push while the first is still running makes the first result irrelevant.
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # Pinned to majors declaring `runs.using: node24`, same as the backup workflow.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          # Read from the file rather than written here, so CI cannot drift away from the
+          # version Railway builds with — they read the same file.
+          python-version-file: backend/.python-version
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install
+        working-directory: backend
+        # requirements-dev pulls in requirements.txt and adds pytest.
+        run: pip install -r requirements-dev.txt
+
+      - name: Run the suite
+        working-directory: backend
+        run: python -m pytest -q
+
+  frontend:
+    name: Frontend and admin build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      # Both bundles are built, and one failing must not hide the state of the other.
+      fail-fast: false
+      matrix:
+        app: [frontend, admin]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          # Matches netlify.toml's NODE_VERSION. A build that passes here on a different
+          # major than Netlify uses is not the check it appears to be.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Install
+        working-directory: ${{ matrix.app }}
+        # `npm ci` rather than `install`: it fails on a lockfile that has drifted from
+        # package.json, which is a real thing to catch rather than silently resolve.
+        run: npm ci
+
+      - name: Build
+        working-directory: ${{ matrix.app }}
+        run: npm run build
