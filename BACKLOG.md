@@ -4,6 +4,57 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
 ---
 
+## Update 1 built — 1 Aug 2026
+
+**The swipe deck is gone.** Committed to `staging` as `cb3523c`, **not yet pushed**.
+
+### What shipped
+
+| | |
+|---|---|
+| Listing | Day headers, chronological within each day. `SwipeStack`, `EventCard`, the queue model, dismissals, the action row, the swipe hint and the immersive shell are all deleted |
+| Rows | Thumbnail, time, name, neighbourhood, price, save. One `EventRow` now serves the listing, Saved and shared lists |
+| Detail | Its own route, `/e/<id>`, bounded hero. `EventSheet` deleted |
+| Video | Play button on the detail page only, full-screen at native 9:16. `Poster` no longer renders video at all |
+| Email | `POST /subscribers`, own table, migration `a1f6c30b74e2`. Capture at the end of the listing and on Saved |
+| Ordering | `_lead_event_id` reverted — it put a promoted row under the wrong day header |
+
+### Decisions taken while building
+
+- **Email goes to our own API, not a provider's embed.** An embed would have loaded a
+  third-party frame and handed that company every visitor's IP, undoing `d299820`. Signing
+  up twice is a no-op whose response is identical to a first signup, so the endpoint
+  cannot be used to test whether an address is on the list.
+- **Detail is a route, not a taller sheet.** It survives a refresh, can be sent to
+  someone, and is the only shape that could ever be indexed (A5).
+- **`skip` and `stack_exhausted` are retired**, replaced by `list_end`, plus `video_play`
+  and `subscribe`. Historical rows are untouched and still reported.
+- **Save rate is now blank for anything after 1 Aug.** It needed an explicit no, which a
+  swipe left was and scrolling past a row is not. Left alone it would have computed
+  saves/(saves+0) and shown a flawless rate for every event ever saved. The Stats tab
+  hides the swipe-era tiles once a range contains none of that data.
+
+### Verified
+
+- 342 backend tests passing; frontend and admin bundles both build
+- Migration applied to the local SQLite database and the schema checked
+- Against a locally running API: chronological order holds with a video event present,
+  `GET /events/{id}` 200s, and signup normalises case, is idempotent, and 422s junk
+- Every route rendered to static markup without crashing; day grouping honours the 5am
+  rollover (a 9pm Aug 1 event files under Aug 1), and rows carry no venue, hook or video
+
+**Not verified: the deployed site.** Nothing has been pushed, so nothing has been seen in
+a real browser — which on this project has caught things nothing else did (a CSP that
+silently blocked every video, a dead CSS selector). Push `staging` and look at it on a
+phone before this goes near `main`.
+
+### Left alone deliberately
+
+Date range filter, venue filter, accounts, user-submitted events, insider-tip reshape,
+share selection (cut), volume on video. All still deferred with the reasons below.
+
+---
+
 ## Session close — 31 Jul 2026
 
 **The swipe interaction is being removed.** That is the headline, and everything below
