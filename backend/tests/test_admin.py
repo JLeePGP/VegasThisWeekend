@@ -66,6 +66,8 @@ class TestAuth:
             ("delete", f"/admin/tips/{'a' * 32}"),
             ("post", "/admin/extract"),
             ("get", "/admin/status"),
+            ("get", "/admin/subscribers"),
+            ("delete", f"/admin/subscribers/{'a' * 32}"),
         ]:
             call = getattr(client, method)
             response = call(path, json={}) if method in {"post", "put"} else call(path)

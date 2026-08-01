@@ -7,9 +7,12 @@ than the address and letting the response reveal who is already on the list.
 
 from __future__ import annotations
 
+from datetime import datetime, time, timedelta
+
 from sqlalchemy import select
 
 from app.models import Subscriber
+from app.timewindow import VEGAS_TZ
 
 
 def signup(client, email="someone@example.com", source="list_end"):
@@ -66,6 +69,92 @@ class TestSigningUpTwice:
         first = signup(client)
         second = signup(client)
         assert (first.status_code, first.json()) == (second.status_code, second.json())
+
+
+class TestTheAdminList:
+    """How John actually gets the addresses out. The `since` window is the whole reason
+    a second export cannot re-add someone who unsubscribed with the provider."""
+
+    def test_the_list_is_returned_in_full(self, client, admin_client):
+        for index in range(3):
+            signup(client, email=f"person{index}@example.com")
+
+        payload = admin_client.get("/admin/subscribers").json()
+        assert payload["total"] == 3
+        assert len(payload["items"]) == 3
+        assert {item["email"] for item in payload["items"]} == {
+            "person0@example.com",
+            "person1@example.com",
+            "person2@example.com",
+        }
+
+    def test_newest_first(self, client, admin_client, db):
+        signup(client, email="first@example.com")
+        signup(client, email="second@example.com")
+
+        # Ordering is by stored timestamp, and two signups in the same test can land in
+        # the same microsecond — so the first one is aged deliberately.
+        row = db.scalars(select(Subscriber).where(Subscriber.email == "first@example.com")).one()
+        row.created_at = row.created_at - timedelta(hours=1)
+        db.commit()
+
+        emails = [item["email"] for item in admin_client.get("/admin/subscribers").json()["items"]]
+        assert emails == ["second@example.com", "first@example.com"]
+
+    def test_since_excludes_earlier_signups(self, client, admin_client, db):
+        signup(client, email="old@example.com")
+        signup(client, email="new@example.com")
+
+        row = db.scalars(select(Subscriber).where(Subscriber.email == "old@example.com")).one()
+        row.created_at = row.created_at - timedelta(days=10)
+        db.commit()
+
+        today = datetime.now(VEGAS_TZ).date()
+        payload = admin_client.get(
+            "/admin/subscribers", params={"since": today.isoformat()}
+        ).json()
+        assert payload["total"] == 1
+        assert payload["items"][0]["email"] == "new@example.com"
+
+    def test_since_counts_from_vegas_midnight_not_utc(self, client, admin_client, db):
+        """A signup at 6pm Vegas is stored as the next day in UTC. Filtering on the UTC
+        day would drop it from an export made the same evening."""
+        signup(client, email="evening@example.com")
+
+        today = datetime.now(VEGAS_TZ).date()
+        row = db.scalars(
+            select(Subscriber).where(Subscriber.email == "evening@example.com")
+        ).one()
+        row.created_at = datetime.combine(today, time(18, 0), tzinfo=VEGAS_TZ)
+        db.commit()
+
+        payload = admin_client.get(
+            "/admin/subscribers", params={"since": today.isoformat()}
+        ).json()
+        assert payload["total"] == 1
+
+    def test_an_address_can_be_removed(self, client, admin_client, db):
+        """Typos, hard bounces and the deploy probe that verified the endpoint."""
+        signup(client, email="typo@exmaple.com")
+        row = db.scalars(select(Subscriber)).one()
+
+        assert admin_client.delete(f"/admin/subscribers/{row.id}").status_code == 204
+        assert db.scalars(select(Subscriber)).all() == []
+
+    def test_removing_an_unknown_id_is_a_404(self, admin_client):
+        assert admin_client.delete(f"/admin/subscribers/{'a' * 32}").status_code == 404
+
+    def test_a_malformed_id_is_rejected_before_the_query(self, admin_client):
+        assert admin_client.delete("/admin/subscribers/../../etc/passwd").status_code == 404
+
+    def test_removing_one_lets_that_person_sign_up_again(self, client, admin_client, db):
+        """A delete is a real delete, so nothing shadows a returning subscriber."""
+        signup(client)
+        row = db.scalars(select(Subscriber)).one()
+        admin_client.delete(f"/admin/subscribers/{row.id}")
+
+        signup(client)
+        assert len(db.scalars(select(Subscriber)).all()) == 1
 
 
 class TestNothingElseIsStored:

@@ -12,7 +12,7 @@ event in front of users on its own.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -39,7 +39,7 @@ from ..video_sources import (
     download_video_page,
     is_resolvable_video_page,
 )
-from ..models import Event, EventTag, ExtractionDraft, InsiderTip
+from ..models import Event, EventTag, ExtractionDraft, InsiderTip, Subscriber
 from ..proxy_guard import secret_status
 from ..recurrence import expand_occurrences
 from ..stats import summary
@@ -676,6 +676,83 @@ def delete_tip(
     db.delete(tip)
     db.commit()
     cache.invalidate()
+
+
+# ------------------------------------------------------------------ subscribers
+
+
+class SubscriberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    email: str
+    source: str
+    created_at: datetime
+
+
+class SubscriberListOut(BaseModel):
+    total: int
+    items: list[SubscriberOut]
+
+
+@router.get("/subscribers", response_model=SubscriberListOut)
+@limiter.limit("20/minute")
+def list_subscribers(
+    request: Request,
+    since: date | None = Query(
+        None,
+        description=(
+            "Only signups from this Vegas date onward. This is how an export avoids "
+            "re-adding people who have since unsubscribed with the provider: export the "
+            "window since the last export rather than the whole table."
+        ),
+    ),
+    db: Session = Depends(get_db),
+) -> SubscriberListOut:
+    """The newsletter list.
+
+    Returned in full rather than paginated: the panel's job here is to hand the whole
+    window to a provider's import box in one go, and a page boundary in the middle of
+    that is a way to silently drop people.
+
+    This is the only admin route that returns personal data. It is bearer-token
+    protected like the rest, and the panel that renders it is never deployed — so
+    addresses only ever appear on John's own machine.
+    """
+    conditions = []
+    if since is not None:
+        # Vegas midnight, not UTC: "since the 15th" means the local day John means.
+        conditions.append(
+            Subscriber.created_at >= vegas_local_to_utc(datetime.combine(since, time(0, 0)))
+        )
+
+    total = db.scalar(select(func.count()).select_from(Subscriber).where(*conditions)) or 0
+    rows = db.scalars(
+        select(Subscriber).where(*conditions).order_by(Subscriber.created_at.desc())
+    ).all()
+    return SubscriberListOut(
+        total=total, items=[SubscriberOut.model_validate(row) for row in rows]
+    )
+
+
+@router.delete("/subscribers/{subscriber_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
+def delete_subscriber(
+    request: Request,
+    subscriber_id: str = Path(pattern=ID_PATTERN),
+    db: Session = Depends(get_db),
+) -> None:
+    """Remove an address: a typo, a hard bounce, or a test row.
+
+    A real delete rather than a flag. An unsubscribe belongs to the provider that sent
+    the email, and keeping a shadow copy of someone who asked to be removed is the thing
+    this table should never do.
+    """
+    row = db.get(Subscriber, subscriber_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Subscriber not found.")
+    db.delete(row)
+    db.commit()
 
 
 # ------------------------------------------------------------------ status

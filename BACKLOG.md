@@ -4,9 +4,83 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
 ---
 
-## Update 1 built — 1 Aug 2026
+## Priority order — agreed 1 Aug 2026
 
-**The swipe deck is gone.** Committed to `staging` as `cb3523c`, **not yet pushed**.
+The newsletter is the top priority; sourcing is the constraint underneath everything.
+
+| # | What | Effort | State |
+|---|---|---|---|
+| 1 | Update 1 deployed, verified in production | — | ✅ done, `cebaa9c` |
+| 2 | **Admin Newsletter tab** — see the list, export a window, remove an address | S | ✅ done |
+| 3 | **Mailing address for the newsletter footer** — John's errand, has a lead time | — | ⬜ |
+| 4 | **Buttondown account + draft-issue script** — query the week's events, emit markdown | M | ⬜ |
+| 5 | **Events, hard — recurring first** | ongoing | ⬜ |
+| 6 | **PWA** — manifest, icons, service worker | S–M | ⬜ |
+| 7 | **Desktop layout** — breakpoints, header nav, sidebar filters, two-column detail | M | ⬜ |
+| 8 | **Edge metadata injection** for `/e/:id` — makes desktop findable, fixes link previews | S | ⬜ |
+
+### Why this order
+
+**Sourcing is doing the quiet work in it.** A weekly issue needs three good things every
+week, forever, and 31% of sessions still reach the end of the catalog. The newsletter
+raises sourcing pressure rather than relieving it — which is exactly the failure that
+killed the five other projects people described at launch. **Recurring events are the
+lever**: one entry expands to twelve weeks through the recurrence code that already
+exists, where a one-off costs the same effort for one row.
+
+**Don't build sending infrastructure for an empty list.** Capture went live today with
+zero subscribers. The list fills first.
+
+### #6–8, the surface work, in the order they pay off
+
+- **PWA is not cosmetic.** iOS evicts localStorage after ~7 days of no visits, which is
+  the actual cause of saved events vanishing — the complaint behind the two people who
+  asked for accounts. Installed web apps are exempt from that. It also unlocks iOS web
+  push (16.4+) without an app store.
+- **Desktop layout is cheap** — there are currently zero layout media queries, so there
+  is nothing to unpick, only breakpoints to add. The shell (`100dvh` + inner scroll)
+  becomes document scroll, `TabBar` becomes header nav, filters become a sidebar.
+- **Desktop's real problem is arrival, not layout.** People reach desktop from Google,
+  and the app is client-rendered. Per-event URLs now exist, so the cheap fix is a Netlify
+  Edge Function injecting `<title>`/OG tags for `/e/:id`. A framework migration would do
+  it properly and costs weeks — not worth it at 14 events.
+
+**Native app: not on this list.** A Capacitor wrapper is days of work plus $99/yr and
+review risk under Apple's minimum-functionality guideline, for something the PWA already
+gives away free. A React Native rewrite ports about 500 of 1,900 frontend lines — every
+screen is a rewrite. Revisit only if push becomes the retention mechanism, and note the
+newsletter is already that.
+
+---
+
+## Newsletter — what has to be true before issue one
+
+| | |
+|---|---|
+| Capture | ✅ live, `POST /subscribers`, own table, no third-party form |
+| Getting addresses out | ✅ Admin → **Newsletter** tab |
+| Consent record | ✅ every row stores `created_at` and which screen it came from |
+| Provider | ⬜ **Buttondown** recommended — usable free tier, plain-text friendly, no growth cruft |
+| Mailing address | ⬜ **CAN-SPAM requires a physical address in every issue.** PO box or virtual mailbox; has a real-world lead time |
+| Draft script | ⬜ query the week's events → markdown issue. This is the loop that makes per-issue cost near zero |
+| Cadence | Thursday, per the copy already in the app |
+
+**The export discipline, and why the tab works the way it does.** Unsubscribes live with
+the provider; this table never hears about them. Exporting the whole list a second time
+would re-add everyone who opted out — the one genuinely unpleasant mistake available
+here. So the tab exports a **window** (`since` a date), records the export date locally,
+and defaults the next export to it. That solves it with no schema column and no state to
+keep in sync. Most providers do keep an unsubscribed address unsubscribed on re-import,
+but verify it for whichever you pick rather than trusting it — the window makes it moot.
+
+**Addresses are masked in the panel** (`jk••••••••@gmail.com`) with reveal per row. The
+realistic leak here is a screen share or a screenshot, not a breach.
+
+---
+
+## Update 1 shipped — 1 Aug 2026
+
+**The swipe deck is gone.** Merged to `main` as `cebaa9c` and verified in production.
 
 ### What shipped
 
@@ -43,10 +117,13 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 - Every route rendered to static markup without crashing; day grouping honours the 5am
   rollover (a 9pm Aug 1 event files under Aug 1), and rows carry no venue, hook or video
 
-**Not verified: the deployed site.** Nothing has been pushed, so nothing has been seen in
-a real browser — which on this project has caught things nothing else did (a CSP that
-silently blocked every video, a dead CSS selector). Push `staging` and look at it on a
-phone before this goes near `main`.
+**Verified in production after the merge:** signup returns 202, the listing opens with a
+10am event instead of the promoted 7:30pm one, `/e/<id>` deep links resolve on the apex
+domain, and `/health` reports `production`. John checked the site on desktop and mobile
+before the merge.
+
+One artefact: verifying signup inserted `deploy-probe@example.com` into the production
+table. Remove it from the Newsletter tab before the first export.
 
 ### Left alone deliberately
 

@@ -17,6 +17,7 @@ import EventList from './components/EventList';
 import BulkPanel from './components/BulkPanel';
 import ExtractPanel from './components/ExtractPanel';
 import StatsPanel from './components/StatsPanel';
+import SubscribersPanel from './components/SubscribersPanel';
 import TipsPanel from './components/TipsPanel';
 
 const BLANK_RECURRENCE = { enabled: false, weekdays: [], until: '' };
@@ -338,6 +339,7 @@ export default function App() {
           ['events', 'Events'],
           ['tips', 'Insider tips'],
           ['stats', 'Stats'],
+          ['subscribers', 'Newsletter'],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -412,6 +414,7 @@ export default function App() {
       {tab === 'events' && <EventList onEdit={startEditing} refreshKey={refreshKey} />}
       {tab === 'tips' && <TipsPanel />}
       {tab === 'stats' && <StatsPanel />}
+      {tab === 'subscribers' && <SubscribersPanel />}
       {tab === 'bulk' && (
         <BulkPanel refreshKey={refreshKey} onReview={(item) => reviewQueued(item)} />
       )}

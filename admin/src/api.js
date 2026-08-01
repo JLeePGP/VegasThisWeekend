@@ -121,4 +121,12 @@ export const updateTip = (id, payload) =>
   request(`/admin/tips/${id}`, { method: 'PUT', body: payload });
 export const deleteTip = (id) => request(`/admin/tips/${id}`, { method: 'DELETE' });
 
+/** The newsletter list. `since` is a Vegas date (YYYY-MM-DD) — pass the date of the last
+ *  export so a second import cannot re-add anyone who has unsubscribed since. */
+export const listSubscribers = ({ since = '' } = {}) =>
+  request(`/admin/subscribers${since ? `?since=${since}` : ''}`);
+
+export const deleteSubscriber = (id) =>
+  request(`/admin/subscribers/${id}`, { method: 'DELETE' });
+
 export { API_BASE };
