@@ -35,7 +35,36 @@ class RecurrenceIn(BaseModel):
     """Turns one event into a series of nights. Omitted means a single occurrence."""
 
     weekdays: list[Weekday] = Field(default_factory=list)
+
+    # 1 is every week, 2 every other week. Capped at 8 because past roughly two months
+    # between nights a run is a handful of dates somebody should enter deliberately.
+    interval_weeks: int = Field(default=1, ge=1, le=8)
+
+    # Set for "first Friday" / "last Thursday": 1-5, or -1 for the last one in the month.
+    # Mutually exclusive with a meaningful `interval_weeks` — see the validator, which
+    # refuses the combination rather than silently picking one.
+    month_position: int | None = Field(default=None)
+
     until_local_date: date | None = None
+
+    @field_validator("month_position")
+    @classmethod
+    def check_position(cls, value: int | None) -> int | None:
+        if value is None or value == -1 or 1 <= value <= 5:
+            return value
+        raise ValueError("month_position must be 1-5, or -1 for the last of the month.")
+
+    @model_validator(mode="after")
+    def one_pattern_only(self) -> RecurrenceIn:
+        # Accepting both would make the result depend on which one the expansion happens
+        # to check first. They are two ways of saying when something happens, not a base
+        # and a modifier, so the combination is a mistake worth reporting.
+        if self.month_position is not None and self.interval_weeks != 1:
+            raise ValueError(
+                "A monthly pattern and a weekly interval cannot be combined — "
+                "use one or the other."
+            )
+        return self
 
 
 class EventWriteIn(BaseModel):
@@ -249,6 +278,8 @@ class ExtractedDraft(BaseModel):
 class ExtractRecurrenceOut(BaseModel):
     repeats: bool
     weekdays: list[str]
+    interval_weeks: int = 1
+    month_position: int | None = None
     until_local_date: str | None
 
 

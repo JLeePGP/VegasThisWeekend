@@ -455,8 +455,43 @@ class TestExtractEndpoint:
         assert body["recurrence"] == {
             "repeats": True,
             "weekdays": ["friday"],
+            "interval_weeks": 1,
+            "month_position": None,
             "until_local_date": "2026-08-28",
         }
+
+    def test_a_fortnightly_run_reaches_the_form_as_fortnightly(
+        self, admin_client, monkeypatch
+    ):
+        """Before the model had somewhere to say this, "every other Friday" arrived as
+        `[friday]` and became every Friday — twice the nights the venue announced."""
+        result = _fake_result(
+            recurrence=RecurrenceHint(
+                repeats=True,
+                weekdays=["friday"],
+                interval_weeks=2,
+                until_local_date="2026-09-25",
+            )
+        )
+        monkeypatch.setattr("app.routers.admin.extract_event", lambda **_: result)
+        body = admin_client.post("/admin/extract", json={"url": "https://example.com/e"}).json()
+        assert body["recurrence"]["interval_weeks"] == 2
+
+    def test_a_first_friday_run_reaches_the_form_as_monthly(
+        self, admin_client, monkeypatch
+    ):
+        result = _fake_result(
+            recurrence=RecurrenceHint(
+                repeats=True,
+                weekdays=["friday"],
+                month_position=1,
+                until_local_date=None,
+            )
+        )
+        monkeypatch.setattr("app.routers.admin.extract_event", lambda **_: result)
+        body = admin_client.post("/admin/extract", json={"url": "https://example.com/e"}).json()
+        assert body["recurrence"]["month_position"] == 1
+        assert body["recurrence"]["interval_weeks"] == 1
 
     def test_extraction_failure_is_a_422_with_the_reason(self, admin_client, monkeypatch):
         def explode(**_):

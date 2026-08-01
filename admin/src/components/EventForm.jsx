@@ -262,6 +262,52 @@ export default function EventForm({
                 </span>
               </div>
 
+              {/* How the nights are spaced. Two patterns rather than one dropdown of
+                  five, because "every N weeks" and "the first Friday of the month" are
+                  genuinely different rules — a month is not four weeks, and offering
+                  "every 4 weeks" as if it meant monthly is how a first-Friday event
+                  ends up in the previous month by December. */}
+              <div className="field" style={{ marginTop: 12 }}>
+                <label>How often</label>
+                <div className="chip-row">
+                  {[
+                    { key: 'weekly', label: 'Every week', interval: 1, position: null },
+                    { key: 'fortnightly', label: 'Every 2 weeks', interval: 2, position: null },
+                    { key: 'triweekly', label: 'Every 3 weeks', interval: 3, position: null },
+                    { key: 'first', label: '1st of the month', interval: 1, position: 1 },
+                    { key: 'second', label: '2nd of the month', interval: 1, position: 2 },
+                    { key: 'third', label: '3rd of the month', interval: 1, position: 3 },
+                    { key: 'last', label: 'Last of the month', interval: 1, position: -1 },
+                  ].map((option) => {
+                    const selected =
+                      (recurrence.monthPosition ?? null) === option.position &&
+                      (recurrence.intervalWeeks ?? 1) === option.interval;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        className="chip"
+                        aria-pressed={selected}
+                        onClick={() =>
+                          onRecurrenceChange({
+                            ...recurrence,
+                            intervalWeeks: option.interval,
+                            monthPosition: option.position,
+                          })
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="field__note" style={{ marginLeft: 0 }}>
+                  {recurrence.monthPosition
+                    ? 'Months with no such date are skipped rather than moved — a month with four Fridays has no fifth one.'
+                    : 'Counted from the start date, so the first night is always included.'}
+                </span>
+              </div>
+
               <div className="field" style={{ marginTop: 12, maxWidth: 220 }}>
                 <label htmlFor="f-until">Last date</label>
                 <input

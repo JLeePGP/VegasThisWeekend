@@ -22,7 +22,15 @@ import StatsPanel from './components/StatsPanel';
 import SubscribersPanel from './components/SubscribersPanel';
 import TipsPanel from './components/TipsPanel';
 
-const BLANK_RECURRENCE = { enabled: false, weekdays: [], until: '' };
+// `intervalWeeks: 1, monthPosition: null` is the weekly default every event entered
+// before today implicitly used, so the blank form behaves exactly as it did.
+const BLANK_RECURRENCE = {
+  enabled: false,
+  weekdays: [],
+  intervalWeeks: 1,
+  monthPosition: null,
+  until: '',
+};
 
 const trimmedOrNull = (value) => {
   const text = (value ?? '').trim();
@@ -59,6 +67,9 @@ function toPayload(form, recurrence, { allowRecurrence }) {
   if (allowRecurrence && recurrence.enabled) {
     payload.recurrence = {
       weekdays: recurrence.weekdays,
+      // The server refuses both at once, so a monthly position always sends interval 1.
+      interval_weeks: recurrence.monthPosition ? 1 : (recurrence.intervalWeeks ?? 1),
+      month_position: recurrence.monthPosition ?? null,
       until_local_date: recurrence.until || null,
     };
   }
@@ -163,20 +174,20 @@ export default function App() {
     setSaveError(null);
     // Recurrence is pre-filled but the checkbox is left off for a queued draft: bulk
     // must never turn one pasted URL into 26 events on the model's say-so.
+    const extracted = result.recurrence.repeats
+      ? {
+          weekdays: result.recurrence.weekdays,
+          // Carried through rather than defaulted: the model reporting "every other
+          // Friday" and the form quietly generating every Friday is the exact bug this
+          // whole pattern field exists to close.
+          intervalWeeks: result.recurrence.interval_weeks ?? 1,
+          monthPosition: result.recurrence.month_position ?? null,
+          until: result.recurrence.until_local_date ?? '',
+        }
+      : null;
+
     setRecurrence(
-      result.recurrence.repeats && !fromQueue
-        ? {
-            enabled: true,
-            weekdays: result.recurrence.weekdays,
-            until: result.recurrence.until_local_date ?? '',
-          }
-        : result.recurrence.repeats
-          ? {
-              enabled: false,
-              weekdays: result.recurrence.weekdays,
-              until: result.recurrence.until_local_date ?? '',
-            }
-          : BLANK_RECURRENCE,
+      extracted ? { enabled: !fromQueue, ...extracted } : BLANK_RECURRENCE,
     );
   }
 

@@ -118,6 +118,8 @@ def build_extract_out(result, *, source_url: str | None) -> ExtractOut:
     recurrence = ExtractRecurrenceOut(
         repeats=result.recurrence.repeats,
         weekdays=[day.value for day in result.recurrence.weekdays],
+        interval_weeks=result.recurrence.interval_weeks,
+        month_position=result.recurrence.month_position,
         until_local_date=result.recurrence.until_local_date,
     )
 
@@ -319,6 +321,8 @@ def create_events(
             first_start_local=payload.starts_at_local,
             duration=duration,
             weekdays=[day.index for day in payload.recurrence.weekdays],
+            interval_weeks=payload.recurrence.interval_weeks,
+            month_position=payload.recurrence.month_position,
             until_local=payload.recurrence.until_local_date,
             limit=settings.max_series_occurrences,
         )

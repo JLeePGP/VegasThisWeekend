@@ -283,3 +283,86 @@ class TestLinkingOlderRows:
         )
         assert response.status_code == 404
         assert {row.series_id for row in db.scalars(select(Event)).all()} == {None}
+
+
+class TestCreatingWithAPattern:
+    """The create endpoint, end to end — the schema, the expansion and the series id."""
+
+    def dates(self, admin_client, recurrence, **overrides):
+        response = admin_client.post(
+            "/admin/events", json=event_payload(recurrence=recurrence, **overrides)
+        )
+        assert response.status_code == 201, response.text
+        return [night["starts_at_local"][:10] for night in response.json()["created"]]
+
+    def test_fortnightly(self, admin_client):
+        assert self.dates(
+            admin_client,
+            {"weekdays": ["friday"], "interval_weeks": 2, "until_local_date": "2026-09-25"},
+        ) == ["2026-08-07", "2026-08-21", "2026-09-04", "2026-09-18"]
+
+    def test_first_friday_of_the_month(self, admin_client):
+        assert self.dates(
+            admin_client,
+            {"weekdays": ["friday"], "month_position": 1, "until_local_date": "2026-11-30"},
+        ) == ["2026-08-07", "2026-09-04", "2026-10-02", "2026-11-06"]
+
+    def test_last_friday_of_the_month(self, admin_client):
+        assert self.dates(
+            admin_client,
+            {"weekdays": ["friday"], "month_position": -1, "until_local_date": "2026-10-31"},
+            starts_at_local="2026-08-28T21:00",
+            ends_at_local="2026-08-29T01:00",
+        ) == ["2026-08-28", "2026-09-25", "2026-10-30"]
+
+    def test_a_patterned_run_is_still_one_series(self, admin_client):
+        response = admin_client.post(
+            "/admin/events",
+            json=event_payload(
+                recurrence={
+                    "weekdays": ["friday"],
+                    "interval_weeks": 2,
+                    "until_local_date": "2026-09-25",
+                }
+            ),
+        )
+        ids = {night["series_id"] for night in response.json()["created"]}
+        assert len(ids) == 1 and ids != {None}
+
+    def test_combining_a_monthly_position_with_an_interval_is_refused(self, admin_client):
+        """They are two ways of saying when something happens. Accepting both would make
+        the result depend on which the expansion checked first."""
+        response = admin_client.post(
+            "/admin/events",
+            json=event_payload(
+                recurrence={
+                    "weekdays": ["friday"],
+                    "interval_weeks": 2,
+                    "month_position": 1,
+                    "until_local_date": "2026-11-30",
+                }
+            ),
+        )
+        assert response.status_code == 422
+
+    def test_an_out_of_range_position_is_refused(self, admin_client):
+        response = admin_client.post(
+            "/admin/events",
+            json=event_payload(
+                recurrence={"weekdays": ["friday"], "month_position": 9}
+            ),
+        )
+        assert response.status_code == 422
+
+    def test_an_absurd_interval_is_refused(self, admin_client):
+        response = admin_client.post(
+            "/admin/events",
+            json=event_payload(recurrence={"weekdays": ["friday"], "interval_weeks": 40}),
+        )
+        assert response.status_code == 422
+
+    def test_omitting_the_pattern_still_means_weekly(self, admin_client):
+        """Every event entered before today sent no interval. They must not change shape."""
+        assert self.dates(
+            admin_client, {"weekdays": ["friday"], "until_local_date": "2026-08-21"}
+        ) == ["2026-08-07", "2026-08-14", "2026-08-21"]
