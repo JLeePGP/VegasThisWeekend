@@ -412,18 +412,28 @@ a {
   transition: color 0.16s, background 0.16s;
 }
 
-.row__save:hover {
-  color: var(--pink);
-  background: var(--pink-soft);
-}
-
 .row__save.is-saved {
   color: var(--pink);
 }
 
-.row__remove:hover {
-  color: var(--red);
-  background: var(--red-soft);
+/* Hover feedback only where a pointer can actually leave again.
+   A touch screen has nothing to move away, so a tap applies `:hover` and it *sticks*
+   until the next scroll or tap elsewhere. On these two controls that is not a cosmetic
+   problem: `.row__save:hover` paints exactly what `.is-saved` paints, so after unsaving
+   from a list row the heart stayed pink over a pink panel and the row read as still
+   saved. The state was correct — aria-pressed flipped, the event really was gone from
+   the list — but nothing on screen said so until you scrolled.
+   Every `:hover` in this file is guarded the same way, for the same reason. */
+@media (hover: hover) {
+  .row__save:hover {
+    color: var(--pink);
+    background: var(--pink-soft);
+  }
+
+  .row__remove:hover {
+    color: var(--red);
+    background: var(--red-soft);
+  }
 }
 
 /* Zero-height marker the pager watches for. */
@@ -952,10 +962,14 @@ a {
   border: 1px solid var(--pink);
 }
 
-.btn--saved:hover {
-  background: var(--red-soft);
-  border-color: var(--red);
-  color: var(--red);
+/* Same rule as the hearts: on a touch screen this would stick after the tap and leave
+   the button showing the "remove" colour while the event is saved. */
+@media (hover: hover) {
+  .btn--saved:hover {
+    background: var(--red-soft);
+    border-color: var(--red);
+    color: var(--red);
+  }
 }
 
 /* ------------------------------------------------------------------ saved + shared */
@@ -1140,8 +1154,10 @@ a {
   transition: transform 0.15s var(--ease-out);
 }
 
-.crash__button:hover {
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .crash__button:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .crash__button:active {
@@ -1159,8 +1175,10 @@ a {
   text-decoration: none;
 }
 
-.detail__link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .detail__link:hover {
+    text-decoration: underline;
+  }
 }
 
 /* ------------------------------------------------------------- share link panel */
@@ -1195,9 +1213,11 @@ a {
   border-radius: 50%;
 }
 
-.sharelink__dismiss:hover {
-  color: var(--text-hi);
-  background: var(--ink-750);
+@media (hover: hover) {
+  .sharelink__dismiss:hover {
+    color: var(--text-hi);
+    background: var(--ink-750);
+  }
 }
 
 .sharelink__url {
@@ -1320,8 +1340,10 @@ a {
   text-decoration: none;
 }
 
-.detail__maplink:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .detail__maplink:hover {
+    text-decoration: underline;
+  }
 }
 
 /* ================================================================ desktop layout
@@ -1423,8 +1445,13 @@ a {
     border-radius: var(--radius-pill);
   }
 
-  .topbar .tab:hover {
-    color: var(--text-hi);
+  /* Nested rather than folded into the outer query: a touchscreen laptop or an iPad in
+     landscape is past 1024px and should still get this layout, it just should not get
+     hover states that stick after a tap. */
+  @media (hover: hover) {
+    .topbar .tab:hover {
+      color: var(--text-hi);
+    }
   }
 
   /* ---------------------------------------------------------------- content column */
@@ -1498,9 +1525,11 @@ a {
     border-color: var(--ink-600);
   }
 
-  .filterbar--desktop .filter-trigger:hover {
-    color: var(--text-hi);
-    border-color: var(--ink-600);
+  @media (hover: hover) {
+    .filterbar--desktop .filter-trigger:hover {
+      color: var(--text-hi);
+      border-color: var(--ink-600);
+    }
   }
 
   .filterbar__clear {
@@ -1512,8 +1541,10 @@ a {
     text-underline-offset: 3px;
   }
 
-  .filterbar__clear:hover {
-    color: var(--text-hi);
+  @media (hover: hover) {
+    .filterbar__clear:hover {
+      color: var(--text-hi);
+    }
   }
 
   /* The inline form of the alcohol-free switch: the same control and the same ARIA, with
@@ -1627,9 +1658,11 @@ a {
     transition: border-color 0.16s, background 0.16s;
   }
 
-  .row:hover {
-    background: var(--ink-800);
-    border-color: var(--ink-600);
+  @media (hover: hover) {
+    .row:hover {
+      background: var(--ink-800);
+      border-color: var(--ink-600);
+    }
   }
 
   .row__main {
