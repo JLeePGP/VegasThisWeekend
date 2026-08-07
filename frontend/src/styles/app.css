@@ -1308,3 +1308,374 @@ a {
 .detail__maplink:hover {
   text-decoration: underline;
 }
+
+/* ================================================================ desktop layout
+
+   Everything from here down is additive and, with one deliberate exception noted
+   immediately below, lives inside a single `@media (min-width: 1024px)` block. Nothing
+   above this line changes. That is the property worth protecting: below the breakpoint
+   this section does not exist, so the phone layout cannot regress from anything written
+   here — which matters because there is no frontend test suite to catch it if it did.
+
+   ⚠ 1024px is written down twice: here, and as DESKTOP_QUERY in `constants.js`. CSS
+   cannot read a JS constant and a custom property is not allowed in a media query, so
+   they are kept in step by hand. If they ever disagree there is a band of widths where
+   this CSS paints the desktop layout while the components still render the mobile one.
+   Change both or neither. */
+
+/* The exception. These three wrappers are new elements that exist only to give the
+   desktop detail view something to make columns out of; `display: contents` removes them
+   from layout entirely, so on a phone the detail page is laid out exactly as it was
+   before they were added. */
+.detail__layout,
+.detail__media,
+.detail__body {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    /* The sticky stack, top to bottom. Each number sets a height *and* is used to offset
+       whatever sticks below it, so the two can never drift apart the way a hand-typed
+       `top: 52px` did. */
+    --desktop-header-h: 68px;
+    --desktop-filters-h: 64px;
+    --desktop-column: 880px;
+  }
+
+  /* ---------------------------------------------------------------- shell */
+
+  /* The phone pins the document and scrolls `.screen` inside it. Here the document
+     scrolls, which is what the wheel, the scrollbar, Page Down, find-in-page and the
+     browser's own scroll restoration all expect to be able to move. */
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overscroll-behavior: auto;
+  }
+
+  .app {
+    max-width: none;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  /* Anchored to the viewport rather than to `.app`. Its stops are percentages of the
+     element it paints, and `.app` is now as tall as the whole document — left absolute,
+     the same gradient stretches into an invisible haze. Fixed keeps it the wash across
+     the top of the window it was drawn as. */
+  .app::before {
+    position: fixed;
+  }
+
+  /* ---------------------------------------------------------------- header + nav */
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    justify-content: flex-start;
+    gap: var(--space-5);
+    height: var(--desktop-header-h);
+    padding: 0 var(--space-6);
+    background: var(--ink-900);
+    border-bottom: 1px solid var(--ink-800);
+  }
+
+  .topbar .tabbar {
+    /* Pushes the clock to the far edge and leaves the nav beside the wordmark, where a
+       pointer expects to find it. */
+    margin-right: auto;
+    gap: var(--space-1);
+    padding: 0;
+    background: none;
+    border-top: none;
+  }
+
+  .topbar .tab {
+    flex: 0 0 auto;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--step-0);
+    border-radius: var(--radius-pill);
+  }
+
+  .topbar .tab:hover {
+    color: var(--text-hi);
+  }
+
+  /* ---------------------------------------------------------------- content column */
+
+  .screen {
+    flex: none;
+    width: 100%;
+    max-width: var(--desktop-column);
+    margin-inline: auto;
+    padding: 0 var(--space-6) var(--space-6);
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  /* Two columns need more room than one. Everything else stays in the narrower measure,
+     because a line of body text 1100px wide is unreadable. */
+  .screen--detail {
+    max-width: 1100px;
+  }
+
+  .banner {
+    margin-inline: 0;
+    margin-top: var(--space-4);
+  }
+
+  /* ---------------------------------------------------------------- filter bar */
+
+  /* Three classes rather than two, so this beats `.screen > .filterbar` on specificity
+     instead of on source order. */
+  .screen > .filterbar.filterbar--desktop {
+    position: sticky;
+    top: var(--desktop-header-h);
+    z-index: 15;
+    gap: var(--space-3);
+    height: var(--desktop-filters-h);
+    padding: 0;
+    background: var(--ink-900);
+  }
+
+  /* On the phone the segmented control stretches to fill the row because it is one of
+     two things in it. Here it is one of five and sizes to its own labels. */
+  .filterbar--desktop .segmented {
+    flex: 0 0 auto;
+  }
+
+  .filterbar--desktop .segmented__option {
+    flex: 0 0 auto;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--step-0);
+  }
+
+  .filterbar--desktop .filter-trigger {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--step-0);
+  }
+
+  .filterbar--desktop .filter-trigger:hover {
+    color: var(--text-hi);
+    border-color: var(--ink-600);
+  }
+
+  .filterbar__clear {
+    margin-left: auto;
+    font-size: var(--step--1);
+    font-weight: 600;
+    color: var(--text-mid);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .filterbar__clear:hover {
+    color: var(--text-hi);
+  }
+
+  /* The inline form of the alcohol-free switch: the same control and the same ARIA, with
+     the explanatory second line dropped. The sheet has room to explain that it combines
+     with the categories rather than replacing them; a filter bar does not, and the
+     shorter label is the same promise. */
+  .switch--inline {
+    width: auto;
+    flex: 0 0 auto;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--step-0);
+    font-weight: 500;
+    color: var(--text-mid);
+    border-radius: var(--radius-pill);
+  }
+
+  .switch--inline[aria-checked='true'] {
+    color: var(--text-hi);
+  }
+
+  .switch--inline .switch__track {
+    width: 34px;
+    height: 20px;
+  }
+
+  .switch--inline .switch__thumb {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .switch--inline[aria-checked='true'] .switch__thumb {
+    transform: translateX(14px);
+  }
+
+  /* ---------------------------------------------------------------- popovers */
+
+  .popover {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .popover .filter-trigger[aria-expanded='true'] {
+    color: var(--text-hi);
+    background: var(--ink-750);
+    border-color: var(--ink-600);
+  }
+
+  .popover__chevron {
+    transition: transform 0.16s var(--ease-out);
+  }
+
+  .filter-trigger[aria-expanded='true'] .popover__chevron {
+    transform: rotate(180deg);
+  }
+
+  .popover__panel {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    z-index: 30;
+    width: max-content;
+    max-width: 360px;
+    padding: var(--space-4);
+    background: var(--ink-850);
+    border: 1px solid var(--ink-700);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    animation: popover-in 0.14s var(--ease-out);
+  }
+
+  @keyframes popover-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+
+  /* ---------------------------------------------------------------- the list */
+
+  .day__heading {
+    /* The sum of everything sticking above it. The phone's hand-typed 52px was the one
+       number in this file most likely to be silently wrong after a change. */
+    top: calc(var(--desktop-header-h) + var(--desktop-filters-h));
+    padding: var(--space-3) 0;
+    font-size: var(--step-2);
+  }
+
+  .day + .day {
+    margin-top: var(--space-6);
+  }
+
+  .list {
+    gap: var(--space-3);
+  }
+
+  .row {
+    border-radius: var(--radius-lg);
+    transition: border-color 0.16s, background 0.16s;
+  }
+
+  .row:hover {
+    background: var(--ink-800);
+    border-color: var(--ink-600);
+  }
+
+  .row__main {
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .row__poster {
+    width: 158px;
+    height: 118px;
+    border-radius: var(--radius-md);
+  }
+
+  .row__when {
+    font-size: 0.78rem;
+  }
+
+  .row__title {
+    margin-top: 4px;
+    font-size: var(--step-2);
+  }
+
+  /* The line Update 1 removed from the phone, back at a width where it costs nothing.
+     Clamped at two lines so one verbose hook cannot make its row twice the height of its
+     neighbours and break the scannability the list exists for. */
+  .row__hook {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    margin-top: var(--space-2);
+    font-size: var(--step-0);
+    line-height: 1.5;
+    color: var(--text-mid);
+  }
+
+  .row__meta {
+    margin-top: var(--space-2);
+    font-size: var(--step-0);
+  }
+
+  .row__save,
+  .row__remove {
+    width: 64px;
+  }
+
+  .signup {
+    max-width: 560px;
+    margin-inline: auto;
+  }
+
+  /* ---------------------------------------------------------------- detail */
+
+  .detail__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+    margin-top: var(--space-2);
+  }
+
+  .detail__media {
+    display: block;
+    /* Follows the reader down the description rather than scrolling off at the top. */
+    position: sticky;
+    top: calc(var(--desktop-header-h) + var(--space-5));
+  }
+
+  .detail__body {
+    display: block;
+    min-width: 0;
+  }
+
+  .detail__hero {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .detail__title {
+    font-size: var(--step-4);
+  }
+
+  .detail__description {
+    font-size: var(--step-1);
+  }
+
+  /* Full-bleed is right on a phone, where the button is the width of the thumb's reach.
+     Stretched across a text column it reads as a banner rather than a control. */
+  .detail__actions {
+    max-width: 420px;
+  }
+}

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { trackListEnd, trackSave } from '../analytics';
-import { DEFAULT_FILTERS } from '../constants';
+import { DEFAULT_FILTERS, DESKTOP_QUERY } from '../constants';
 import { dayHeading, groupByDay } from '../format';
 import useEvents from '../hooks/useEvents';
+import useMediaQuery from '../hooks/useMediaQuery';
 import { useSavedEvents } from '../store/savedEvents';
 import EmailCapture from './EmailCapture';
 import EmptyState from './EmptyState';
 import EventRow from './EventRow';
 import FilterBar from './FilterBar';
+import FilterBarDesktop from './FilterBarDesktop';
 
 // The listing. Every event matching the filters, grouped under the day it belongs to and
 // in time order within each day.
@@ -21,6 +23,11 @@ import FilterBar from './FilterBar';
 export default function ListScreen({ filters, onFiltersChange }) {
   const { status, items, total, hasMore, sampleData, error, loadMore, reload } = useEvents(filters);
   const { save, isSaved } = useSavedEvents();
+
+  // The two filter bars take identical props and drive the same state in `App`. Only the
+  // arrangement differs — a bottom sheet where space is scarce, labelled dropdowns where
+  // it is not — so nothing below this line knows which one is mounted.
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
 
   const days = useMemo(() => groupByDay(items), [items]);
 
@@ -163,7 +170,11 @@ export default function ListScreen({ filters, onFiltersChange }) {
         </p>
       )}
 
-      <FilterBar filters={filters} onChange={onFiltersChange} />
+      {isDesktop ? (
+        <FilterBarDesktop filters={filters} onChange={onFiltersChange} />
+      ) : (
+        <FilterBar filters={filters} onChange={onFiltersChange} />
+      )}
 
       {renderList()}
     </div>

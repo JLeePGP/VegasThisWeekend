@@ -44,3 +44,13 @@ export const DEFAULT_FILTERS = { date: 'weekend', vibes: [], prices: [], alcohol
 
 // Matches the backend's MAX_SHARE_EVENTS.
 export const MAX_SHARE_EVENTS = 20;
+
+// The one place the desktop breakpoint is written down.
+//
+// ⚠ This value is duplicated in app.css, in the `@media (min-width: 1024px)` block at the
+// foot of the file. CSS cannot read a JS constant and a custom property cannot be used in
+// a media query, so the two have to be kept in step by hand. If they ever disagree there
+// is a band of widths where the CSS paints the desktop layout while the components still
+// render the mobile one — which looks like a rendering bug and is really an arithmetic
+// one. Change both or neither.
+export const DESKTOP_QUERY = '(min-width: 1024px)';

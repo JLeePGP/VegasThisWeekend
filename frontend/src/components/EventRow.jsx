@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { priceLabel } from '../constants';
+import { DESKTOP_QUERY, priceLabel } from '../constants';
 import { hasFinished, timeLabel, whenLabel } from '../format';
+import useMediaQuery from '../hooks/useMediaQuery';
 import { IconSave, IconTrash } from './Icons';
 import Poster from './Poster';
 
@@ -8,10 +9,17 @@ import Poster from './Poster';
 // list. They were three components with three slightly different ideas of what a row
 // says; the differences were accidents rather than decisions.
 //
-// What a row deliberately does not carry: a hook line, and the venue. The hook made rows
-// read like every other event site, and the curation here lives in *which* events are
-// listed rather than in a line of copy about each one. Venue belongs on the detail view,
-// where there is room for the address and a map link next to it.
+// The hook is shown at desktop widths and hidden below them, and that is a narrower rule
+// than it looks. Update 1 cut the hook from rows because it "read as Eventbrite" — but
+// the real cost was vertical: beside a 58px thumbnail on a 390px screen a hook is a third
+// and fourth line of wrapped text, which pushes the next event off the fold and makes the
+// list worse at the one job it has, letting someone compare a whole evening at a glance.
+// A desktop row is wide and has empty space to the right of the title instead, so the
+// same line costs nothing there. The original judgement still holds everywhere it was
+// made.
+//
+// The venue is still not here at any width. It belongs on the detail view, where the
+// address and a map link sit next to it.
 
 /**
  * @param {boolean} withDay  Show the day as well as the time. The listing groups by day
@@ -20,6 +28,7 @@ import Poster from './Poster';
  */
 export default function EventRow({ event, withDay = false, onSave, isSaved = false, onRemove }) {
   const finished = hasFinished(event.end_at);
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
 
   return (
     <li className="row">
@@ -36,6 +45,7 @@ export default function EventRow({ event, withDay = false, onSave, isSaved = fal
         <span className="row__text">
           <span className="row__when">{withDay ? whenLabel(event.start_at) : timeLabel(event.start_at)}</span>
           <span className="row__title">{event.name}</span>
+          {isDesktop && event.hook && <span className="row__hook">{event.hook}</span>}
           <span className="row__meta">
             {event.neighborhood}
             <span className="row__price">{event.price_note || priceLabel(event.price_tier)}</span>

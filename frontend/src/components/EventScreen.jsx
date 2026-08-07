@@ -115,121 +115,132 @@ export default function EventScreen() {
         Back
       </button>
 
-      <div className="detail__hero">
-        <Poster event={event} />
+      {/* These three wrappers are `display: contents` below the desktop breakpoint, so on
+          a phone they contribute nothing at all and the stacking order is byte-for-byte
+          what it was. At desktop widths they become a two-column grid: media on the left,
+          everything readable on the right. Wrapping was the only way to get two columns
+          without duplicating the markup — a grid cannot span its grandchildren. */}
+      <div className="detail__layout">
+        <div className="detail__media">
+          <div className="detail__hero">
+            <Poster event={event} />
 
-        {/* Video lives behind this button and nowhere else. It is not the background of
-            this page, and it is not in the list. */}
-        {event.video_url && (
-          <button
-            type="button"
-            className="detail__play"
-            onClick={() => {
-              trackVideoPlay(event.id);
-              setPlaying(true);
-            }}
-          >
-            <IconPlay width={20} height={20} />
-            Play video
-          </button>
-        )}
-      </div>
-
-      <h1 className="detail__title">{event.name}</h1>
-
-      <dl className="detail__facts">
-        <div className="detail__fact">
-          <dt>When</dt>
-          <dd>
-            {fullDateLabel(event.start_at)} · {rangeLabel(event.start_at, event.end_at)}
-          </dd>
+            {/* Video lives behind this button and nowhere else. It is not the background
+                of this page, and it is not in the list. */}
+            {event.video_url && (
+              <button
+                type="button"
+                className="detail__play"
+                onClick={() => {
+                  trackVideoPlay(event.id);
+                  setPlaying(true);
+                }}
+              >
+                <IconPlay width={20} height={20} />
+                Play video
+              </button>
+            )}
+          </div>
         </div>
-        <div className="detail__fact">
-          <dt>Where</dt>
-          <dd>
-            {event.venue}, {event.neighborhood}
-            {event.address && <span className="detail__address">{event.address}</span>}
+
+        <div className="detail__body">
+          <h1 className="detail__title">{event.name}</h1>
+
+          <dl className="detail__facts">
+            <div className="detail__fact">
+              <dt>When</dt>
+              <dd>
+                {fullDateLabel(event.start_at)} · {rangeLabel(event.start_at, event.end_at)}
+              </dd>
+            </div>
+            <div className="detail__fact">
+              <dt>Where</dt>
+              <dd>
+                {event.venue}, {event.neighborhood}
+                {event.address && <span className="detail__address">{event.address}</span>}
+                <a
+                  className="detail__maplink"
+                  href={mapsUrl(event)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <IconPin width={14} height={14} />
+                  Open in Maps
+                </a>
+              </dd>
+            </div>
+            <div className="detail__fact">
+              <dt>Price</dt>
+              <dd>{event.price_note || priceLabel(event.price_tier)}</dd>
+            </div>
+            <div className="detail__fact">
+              <dt>Category</dt>
+              <dd>{vibeLabel(event.vibe)}</dd>
+            </div>
+          </dl>
+
+          <p className="detail__description">{event.description}</p>
+
+          {event.source_url && (
             <a
-              className="detail__maplink"
-              href={mapsUrl(event)}
+              className="detail__link"
+              href={event.source_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWebsiteClick(event.id)}
             >
-              <IconPin width={14} height={14} />
-              Open in Maps
+              <IconGlobe width={16} height={16} />
+              Event website
             </a>
-          </dd>
-        </div>
-        <div className="detail__fact">
-          <dt>Price</dt>
-          <dd>{event.price_note || priceLabel(event.price_tier)}</dd>
-        </div>
-        <div className="detail__fact">
-          <dt>Category</dt>
-          <dd>{vibeLabel(event.vibe)}</dd>
-        </div>
-      </dl>
+          )}
 
-      <p className="detail__description">{event.description}</p>
+          {event.insider_tip && (
+            <div className="tip">
+              <button
+                type="button"
+                className="tip__toggle"
+                aria-expanded={tipRevealed}
+                onClick={() => {
+                  // Only count the reveal, not the collapse.
+                  if (!tipRevealed) trackTipReveal(event.id);
+                  setTipRevealed((current) => !current);
+                }}
+              >
+                <IconTip className="tip__icon" width={20} height={20} />
+                Insider tip
+                <IconChevronDown className="tip__chevron" width={18} height={18} />
+              </button>
+              {tipRevealed && <p className="tip__body">{event.insider_tip}</p>}
+            </div>
+          )}
 
-      {event.source_url && (
-        <a
-          className="detail__link"
-          href={event.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => trackWebsiteClick(event.id)}
-        >
-          <IconGlobe width={16} height={16} />
-          Event website
-        </a>
-      )}
-
-      {event.insider_tip && (
-        <div className="tip">
-          <button
-            type="button"
-            className="tip__toggle"
-            aria-expanded={tipRevealed}
-            onClick={() => {
-              // Only count the reveal, not the collapse.
-              if (!tipRevealed) trackTipReveal(event.id);
-              setTipRevealed((current) => !current);
-            }}
-          >
-            <IconTip className="tip__icon" width={20} height={20} />
-            Insider tip
-            <IconChevronDown className="tip__chevron" width={18} height={18} />
-          </button>
-          {tipRevealed && <p className="tip__body">{event.insider_tip}</p>}
+          <div className="detail__actions">
+            {event.ticket_url && (
+              <a
+                className="btn btn--secondary"
+                href={event.ticket_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackTicketClick(event.id)}
+              >
+                <IconTicket width={18} height={18} />
+                Tickets
+              </a>
+            )}
+            <button
+              type="button"
+              className="btn btn--primary btn--block"
+              disabled={saved}
+              onClick={() => {
+                trackSave(event.id);
+                save(event);
+              }}
+            >
+              <IconSave width={18} height={18} />
+              {saved ? 'Saved' : 'Save'}
+            </button>
+          </div>
         </div>
-      )}
-
-      <div className="detail__actions">
-        {event.ticket_url && (
-          <a
-            className="btn btn--secondary"
-            href={event.ticket_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackTicketClick(event.id)}
-          >
-            <IconTicket width={18} height={18} />
-            Tickets
-          </a>
-        )}
-        <button
-          type="button"
-          className="btn btn--primary btn--block"
-          disabled={saved}
-          onClick={() => {
-            trackSave(event.id);
-            save(event);
-          }}
-        >
-          <IconSave width={18} height={18} />
-          {saved ? 'Saved' : 'Save'}
-        </button>
       </div>
 
       {playing && (

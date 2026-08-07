@@ -5,8 +5,9 @@ import ListScreen from './components/ListScreen';
 import SavedScreen from './components/SavedScreen';
 import SharedListScreen from './components/SharedListScreen';
 import TabBar from './components/TabBar';
-import { DEFAULT_FILTERS } from './constants';
+import { DEFAULT_FILTERS, DESKTOP_QUERY } from './constants';
 import { fullDateLabel } from './format';
+import useMediaQuery from './hooks/useMediaQuery';
 
 export default function App() {
   // Held here rather than in the screen so a trip to Saved, or into an event and back,
@@ -24,10 +25,17 @@ export default function App() {
   // the four the PRD cares about.
   const changeFilters = setFilters;
 
+  // A bottom tab bar is a phone convention — it sits where a thumb is. On a desktop
+  // pointer it is just navigation parked in the least reachable corner of the window, so
+  // the same component moves into the header instead. One `TabBar`, two positions: the
+  // links, the counter and the active state are identical in both.
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
+
   return (
     <div className="app">
       <header className="topbar">
         <h1 className="wordmark">Vegas This Weekend</h1>
+        {isDesktop && <TabBar />}
         <div className="topbar__clock">
           <strong>{fullDateLabel(new Date())}</strong>
           <span>Vegas time</span>
@@ -42,7 +50,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      <TabBar />
+      {!isDesktop && <TabBar />}
     </div>
   );
 }
