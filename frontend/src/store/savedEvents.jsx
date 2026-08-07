@@ -56,6 +56,32 @@ export function SavedEventsProvider({ children }) {
     setSaved((current) => current.filter((item) => item.id !== id));
   }, []);
 
+  /**
+   * Save if it isn't saved, remove it if it is. Returns whether it is saved *now*, which
+   * is what lets the caller count a genuine save and stay silent on an undo.
+   *
+   * The list mutation goes through a functional update so it is always correct against
+   * the newest state, while the returned answer is read from the rendered `saved` — the
+   * heart the visitor is actually looking at. React does not promise to run an updater
+   * before this function returns, so a value set inside one could not be trusted here.
+   */
+  const toggleSave = useCallback(
+    (event) => {
+      if (!looksLikeEvent(event)) return false;
+      const wasSaved = saved.some((item) => item.id === event.id);
+
+      setSaved((current) => {
+        const exists = current.some((item) => item.id === event.id);
+        return exists
+          ? current.filter((item) => item.id !== event.id)
+          : [...current, { ...event, savedAt: Date.now() }];
+      });
+
+      return !wasSaved;
+    },
+    [saved],
+  );
+
   const clearSaved = useCallback(() => setSaved([]), []);
 
   const value = useMemo(() => {
@@ -67,9 +93,10 @@ export function SavedEventsProvider({ children }) {
       isSaved: (id) => savedIds.has(id),
       save,
       remove,
+      toggleSave,
       clearSaved,
     };
-  }, [saved, save, remove, clearSaved]);
+  }, [saved, save, remove, toggleSave, clearSaved]);
 
   return <SavedEventsContext.Provider value={value}>{children}</SavedEventsContext.Provider>;
 }

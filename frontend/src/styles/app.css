@@ -943,6 +943,21 @@ a {
   width: 100%;
 }
 
+/* The detail view's Save button once the event is on the list. Deliberately not
+   `:disabled` — it is still a live control, it just is not the primary action any more.
+   The heart fills to carry the state, so the button reads as done rather than as off. */
+.btn--saved {
+  color: var(--pink);
+  background: var(--pink-soft);
+  border: 1px solid var(--pink);
+}
+
+.btn--saved:hover {
+  background: var(--red-soft);
+  border-color: var(--red);
+  color: var(--red);
+}
+
 /* ------------------------------------------------------------------ saved + shared */
 
 .screen {
@@ -1338,8 +1353,8 @@ a {
     /* The sticky stack, top to bottom. Each number sets a height *and* is used to offset
        whatever sticks below it, so the two can never drift apart the way a hand-typed
        `top: 52px` did. */
-    --desktop-header-h: 68px;
-    --desktop-filters-h: 64px;
+    --desktop-header-h: 72px;
+    --desktop-filters-h: 84px;
     --desktop-column: 880px;
   }
 
@@ -1384,8 +1399,11 @@ a {
     gap: var(--space-5);
     height: var(--desktop-header-h);
     padding: 0 var(--space-6);
-    background: var(--ink-900);
-    border-bottom: 1px solid var(--ink-800);
+    /* Lifted off the page rather than sharing its colour. Sticky chrome that matches the
+       background exactly reads as part of the content and gives the eye nothing to
+       anchor on while scrolling. */
+    background: var(--ink-850);
+    border-bottom: 1px solid var(--ink-700);
   }
 
   .topbar .tabbar {
@@ -1442,8 +1460,15 @@ a {
     z-index: 15;
     gap: var(--space-3);
     height: var(--desktop-filters-h);
-    padding: 0;
-    background: var(--ink-900);
+    /* Full column bleed, so the band reads as a toolbar belonging to the page rather
+       than as a row of controls floating on the background. The negative margin is
+       exactly the screen's own padding, so it stops at the column edge and cannot cause
+       horizontal overflow the way a `100vw` bleed does once a scrollbar exists. */
+    margin-inline: calc(-1 * var(--space-6));
+    padding: 0 var(--space-6);
+    background: var(--ink-850);
+    border-bottom: 1px solid var(--ink-700);
+    box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.9);
   }
 
   /* On the phone the segmented control stretches to fill the row because it is one of
@@ -1452,15 +1477,25 @@ a {
     flex: 0 0 auto;
   }
 
+  /* Bigger hit areas and bigger type than the phone's, because the bar is now a
+     permanent fixture at the top of the page rather than a row that scrolls away. */
+  .filterbar--desktop .segmented {
+    padding: 4px;
+    background: var(--ink-900);
+    border-color: var(--ink-600);
+  }
+
   .filterbar--desktop .segmented__option {
     flex: 0 0 auto;
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-5);
     font-size: var(--step-0);
   }
 
   .filterbar--desktop .filter-trigger {
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
     font-size: var(--step-0);
+    background: var(--ink-900);
+    border-color: var(--ink-600);
   }
 
   .filterbar--desktop .filter-trigger:hover {
@@ -1489,10 +1524,12 @@ a {
     width: auto;
     flex: 0 0 auto;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
     font-size: var(--step-0);
     font-weight: 500;
     color: var(--text-mid);
+    background: var(--ink-900);
+    border-color: var(--ink-600);
     border-radius: var(--radius-pill);
   }
 
@@ -1565,8 +1602,16 @@ a {
     /* The sum of everything sticking above it. The phone's hand-typed 52px was the one
        number in this file most likely to be silently wrong after a change. */
     top: calc(var(--desktop-header-h) + var(--desktop-filters-h));
-    padding: var(--space-3) 0;
-    font-size: var(--step-2);
+    padding: var(--space-4) 0 var(--space-3);
+    font-size: var(--step-3);
+  }
+
+  .day__lead + .day__date {
+    font-size: var(--step-1);
+  }
+
+  .day__count {
+    font-size: 0.78rem;
   }
 
   .day + .day {

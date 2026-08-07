@@ -11,7 +11,7 @@ import EventRow from './EventRow';
 export default function SharedListScreen() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { save, isSaved, savedIds } = useSavedEvents();
+  const { save, isSaved, savedIds, toggleSave } = useSavedEvents();
   const { show } = useToast();
 
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
@@ -83,9 +83,9 @@ export default function SharedListScreen() {
             key={event.id}
             event={event}
             withDay
-            onSave={(saveTarget) => {
-              trackSave(saveTarget.id);
-              save(saveTarget);
+            onToggleSave={(target) => {
+              // Same rule as the listing: count the add, stay silent on the undo.
+              if (toggleSave(target)) trackSave(target.id);
             }}
             isSaved={isSaved(event.id)}
           />

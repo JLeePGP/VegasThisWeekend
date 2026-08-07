@@ -43,7 +43,7 @@ export default function EventScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { save, isSaved } = useSavedEvents();
+  const { toggleSave, isSaved } = useSavedEvents();
 
   // Arriving from a list carries the event in router state, so the common path renders
   // immediately. A direct link, a refresh or a shared URL has none, and fetches.
@@ -227,13 +227,18 @@ export default function EventScreen() {
                 Tickets
               </a>
             )}
+            {/* A toggle, not a one-way door. This was `disabled` once saved, which is
+                the correct look for an action that cannot be taken and the wrong one for
+                an action that simply has already been taken — it left the only way to
+                unsave on a different screen. Saved state is a filled heart on a quieter
+                button, so it never reads as the primary thing to do next and never reads
+                as unavailable either. */}
             <button
               type="button"
-              className="btn btn--primary btn--block"
-              disabled={saved}
+              className={saved ? 'btn btn--saved btn--block' : 'btn btn--primary btn--block'}
+              aria-pressed={saved}
               onClick={() => {
-                trackSave(event.id);
-                save(event);
+                if (toggleSave(event)) trackSave(event.id);
               }}
             >
               <IconSave width={18} height={18} />

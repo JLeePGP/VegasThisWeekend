@@ -26,7 +26,13 @@ import Poster from './Poster';
  *   under a header, so a row there needs only the time; Saved and shared lists are one
  *   flat run across several days and would be ambiguous without it.
  */
-export default function EventRow({ event, withDay = false, onSave, isSaved = false, onRemove }) {
+export default function EventRow({
+  event,
+  withDay = false,
+  onToggleSave,
+  isSaved = false,
+  onRemove,
+}) {
   const finished = hasFinished(event.end_at);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
 
@@ -55,14 +61,19 @@ export default function EventRow({ event, withDay = false, onSave, isSaved = fal
       </Link>
 
       {/* Outside the link, or a save would navigate. Saving is the one thing that
-          survived the swipe deck, and it stays one tap from the list. */}
-      {onSave && (
+          survived the swipe deck, and it stays one tap from the list.
+
+          It is a toggle in both directions. It always looked like one — `aria-pressed`
+          said so and the heart filled in — but a second tap used to call save() again,
+          which the store treats as a no-op, so the only way back out was the trash icon
+          on a different screen. */}
+      {onToggleSave && (
         <button
           type="button"
           className={isSaved ? 'row__save is-saved' : 'row__save'}
-          onClick={() => onSave(event)}
+          onClick={() => onToggleSave(event)}
           aria-pressed={isSaved}
-          aria-label={isSaved ? `Saved: ${event.name}` : `Save ${event.name}`}
+          aria-label={isSaved ? `Remove ${event.name} from saved` : `Save ${event.name}`}
         >
           <IconSave width={19} height={19} />
         </button>

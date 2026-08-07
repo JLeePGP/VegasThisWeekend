@@ -22,7 +22,7 @@ import FilterBarDesktop from './FilterBarDesktop';
 
 export default function ListScreen({ filters, onFiltersChange }) {
   const { status, items, total, hasMore, sampleData, error, loadMore, reload } = useEvents(filters);
-  const { save, isSaved } = useSavedEvents();
+  const { toggleSave, isSaved } = useSavedEvents();
 
   // The two filter bars take identical props and drive the same state in `App`. Only the
   // arrangement differs — a bottom sheet where space is scarce, labelled dropdowns where
@@ -31,12 +31,17 @@ export default function ListScreen({ filters, onFiltersChange }) {
 
   const days = useMemo(() => groupByDay(items), [items]);
 
-  const handleSave = useCallback(
+  // Counted only when the tap actually adds the event. The old version fired `save`
+  // before the store had decided anything, so tapping an already-saved heart five times
+  // sent five counters and stored one event — inflating the single metric the Stats tab
+  // leans on hardest. There is no `unsave` counter on purpose: `Metric` is a closed enum
+  // server-side, so adding one is a backend change and a production deploy, and it is not
+  // a question anything currently rides on.
+  const handleToggleSave = useCallback(
     (event) => {
-      trackSave(event.id);
-      save(event);
+      if (toggleSave(event)) trackSave(event.id);
     },
-    [save],
+    [toggleSave],
   );
 
   // Paging is driven by a sentinel at the foot of the list rather than by a scroll
@@ -139,7 +144,7 @@ export default function ListScreen({ filters, onFiltersChange }) {
                   <EventRow
                     key={event.id}
                     event={event}
-                    onSave={handleSave}
+                    onToggleSave={handleToggleSave}
                     isSaved={isSaved(event.id)}
                   />
                 ))}
