@@ -101,4 +101,18 @@ production API, so a scripted pass writes real counters into the data the roadma
 from. Assert on values read out of the page, not on numbers typed into the test — offsets
 that were hardcoded in a test reported six false failures the first time the chrome grew.
 
+**For anything visual, assert on the resolved colour, not on the state behind it.** A save
+toggle shipped with `aria-pressed`, `localStorage` and the Saved list all correct and all
+tested, and it still looked broken on a phone: a `:hover` rule stuck to the tap and kept
+painting the saved colour over an unsaved control. `getComputedStyle` catches that; nothing
+else in three rounds of testing did.
+
+**Every `:hover` belongs inside `@media (hover: hover)`.** A touch screen has no pointer to
+move away, so `:hover` sticks from the tap until the next scroll. Where a hover style
+resembles a state style, that stuck rule impersonates the state.
+
+**A narrow desktop viewport is not a phone.** Use `devices['iPhone 14']` from
+`playwright-core` — real touch events, mobile UA, and `matchMedia('(hover: hover)')` false.
+A 390px desktop browser reports hover capability and hides this whole class of bug.
+
 Cost and performance estimates here have been wrong more often than right. Measure.

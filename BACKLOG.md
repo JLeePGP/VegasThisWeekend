@@ -6,9 +6,10 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
 ## Session close — 7 Aug 2026
 
-Two commits, `main` and `staging` both at `09554fc`, deployed and verified in production.
-400 backend tests passing. Built on `staging` first and held there until John had done a
-QA pass on the deployed staging site.
+Three commits plus this entry, `main` and `staging` in step, all deployed and verified in
+production. 400 backend tests passing. Built on `staging` first and held there until John
+had done a QA pass on the deployed staging site — which is also how the one bug that got
+through was caught, on a real phone rather than in emulation.
 
 ### What shipped
 
@@ -16,6 +17,7 @@ QA pass on the deployed staging site.
 |---|---|
 | `deaa480` | **Desktop layout** — the site stopped being a phone emulator on a monitor |
 | `09554fc` | **Saving is a toggle**, and the desktop sticky chrome lifted off the background |
+| `f06c3ea` | **Hover states no longer stick to a tap** — found by John on a real phone after the merge |
 
 **The desktop layout is one app, not two.** Width decides — `useMediaQuery` plus a single
 `@media (min-width: 1024px)` block at the foot of `app.css` — and the components fork
@@ -64,6 +66,35 @@ three `save` items on the request to `/interactions`.
 adding one is a backend change plus a production deploy — and staging runs against the
 production API, so it could not be verified in the sandbox anyway. Worth doing if the
 question gets asked; nothing currently rides on it.
+
+### The bug that got through, and why it got through
+
+After the merge John found that unsaving from a list row on a phone looked like it did
+nothing. It was not the toggle: the event really was removed, `aria-pressed` flipped, it
+left the Saved list. **The heart just stayed pink over a pink panel until he scrolled.**
+
+A touch screen has no pointer to move away, so iOS applies `:hover` on tap and holds it
+until the next scroll or tap elsewhere. `.row__save:hover` paints `color: pink` plus a
+`pink-soft` background — very nearly exactly what `.is-saved` paints. So the stuck hover
+was a pixel-perfect impersonation of the state that had just been removed.
+
+**The rule predates this session.** It was invisible while saving was one-way, because the
+stuck pink always happened to agree with reality. Making unsave possible turned it into a
+lie. Every `:hover` in `app.css` is now behind `@media (hover: hover)` — not just the one
+reported, because the rest have the same defect and differ only in how loudly they show
+it. The four inside the desktop block are nested rather than folded into the outer query,
+since a touchscreen laptop is past 1024px and should keep the layout while losing hover.
+
+**Why three rounds of passing tests missed it.** Every assertion was on `aria-pressed` and
+`localStorage`, and both were correct the whole time. Nothing looked at what was painted.
+The lesson generalises past this bug: *for a visual state bug, assert on resolved colour,
+not on the state the colour is supposed to represent.* The regression test now reads
+`getComputedStyle`, fails against the pre-fix build for exactly the reported reason, and
+also checks the opposite direction so the guard cannot be quietly over-applied later.
+
+Emulating a phone is also not the same as emulating touch. The first passes used a 390px
+*desktop* browser; `devices['iPhone 14']` with `hasTouch` and `matchMedia('(hover: hover)')
+=== false` is what reproduces this class of bug.
 
 ### Numbers to discount when reading 7 Aug
 
