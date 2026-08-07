@@ -4,6 +4,124 @@ Consolidated 30 Jul 2026 — John's feedback merged with the 29 Jul audit.
 
 ---
 
+## Session close — 7 Aug 2026
+
+Two commits, `main` and `staging` both at `09554fc`, deployed and verified in production.
+400 backend tests passing. Built on `staging` first and held there until John had done a
+QA pass on the deployed staging site.
+
+### What shipped
+
+| Commit | What |
+|---|---|
+| `deaa480` | **Desktop layout** — the site stopped being a phone emulator on a monitor |
+| `09554fc` | **Saving is a toggle**, and the desktop sticky chrome lifted off the background |
+
+**The desktop layout is one app, not two.** Width decides — `useMediaQuery` plus a single
+`@media (min-width: 1024px)` block at the foot of `app.css` — and the components fork
+behind a boolean where the structure genuinely differs. Filters run along the top as
+labelled dropdowns instead of a bottom sheet, the listing is an 880px column of wide rows
+carrying the hook line, `TabBar` moves into the header, and detail is two columns.
+
+**Below 1024px nothing changed.** That is a property of how it was built, not a hope:
+every desktop rule lives inside that one media query, and the three wrappers added to
+`EventScreen` are `display: contents` below the breakpoint, so the phone is laid out from
+an identical box tree. Verified on the deployed site at 1023px and 390px — shell still
+capped at 520px, day headings still at 52px, posters still 58px, no hook line.
+
+**The hook came back to rows, on desktop only.** Update 1 cut it because it read as
+Eventbrite. The real cost was vertical: beside a 58px thumbnail on a 390px screen it wraps
+to two more lines and pushes the next event off the fold. A desktop row has empty space to
+the right of the title instead. `hook` was already in the list payload, so this was JSX
+and CSS with no backend work.
+
+### Two decisions worth not re-opening
+
+- **Width, never device.** UA sniffing cannot answer what a dragged-narrow window or a
+  split-screen tablet should do, and iPadOS reports itself as macOS. A desktop window
+  dragged below 1024px shows the mobile layout — that is correct, and it is what Eventbrite
+  does too. It will look like a bug the first time you see it.
+- **The breakpoint is written down twice**, in `constants.js` and in `app.css`, because a
+  custom property cannot be used in a media query. If they ever disagree there is a band of
+  widths where the CSS paints one layout and the components render the other. Change both
+  or neither.
+
+### The save bug, and the data bug hiding behind it
+
+Saving was one-way in **three** places, not the two that were reported — the shared-list
+screen had the same defect. The store already had `remove()`; all three call sites were
+simply wired one direction, and the detail button was `disabled` once saved, which is the
+right look for an action that cannot be taken and the wrong one for an action already
+taken.
+
+**`trackSave` was firing on every tap**, before the store decided anything, so tapping an
+already-saved heart five times sent five counters and stored one event. That has been
+inflating `save` since the heart shipped on 1 Aug. It now fires only when the tap actually
+adds the event — checked on the wire, not in the source: six taps on one heart put exactly
+three `save` items on the request to `/interactions`.
+
+**There is deliberately no `unsave` counter.** `Metric` is a closed enum server-side, so
+adding one is a backend change plus a production deploy — and staging runs against the
+production API, so it could not be verified in the sandbox anyway. Worth doing if the
+question gets asked; nothing currently rides on it.
+
+### Numbers to discount when reading 7 Aug
+
+Verification traffic against staging hits the **production** API. Before I started stubbing
+the analytics endpoint, roughly **7 `session_start`, 4 `detail_open`, 3 `save`** and a few
+`list_end` came from browser automation rather than from people. Later runs stubbed
+`/interactions` and wrote nothing.
+
+### Where to pick up
+
+**The image crop is the one open design call from this session.** Row thumbnails are
+158×118 (ratio 1.34) with `object-fit: cover`. Measured across the 9 live events: 2
+portrait (0.67), 2 square, 5 landscape (up to 2.0). 1.34 is the median-optimal choice, but
+wide banners lose their edges — the Earl Turner flyer reads "ARL TURNER" — and portrait
+flyers lose about half their height. The alternative is `contain` with a backdrop: nothing
+ever cropped, but portrait flyers get wide side bars and the rows stop looking uniform.
+Left as `cover` deliberately; the row already carries name, time and price as text, so the
+image is reinforcement rather than the information.
+
+**Mobile's sticky chrome has the same low-contrast problem desktop had** — filter bar and
+day headings are both `--ink-900`, the exact colour of the page behind them. Deliberately
+not changed, because a taller bar on a phone costs fold space. The colour lift alone would
+be cheap if it is wanted.
+
+**The tiebreaker from 1 Aug is now half-spent.** Desktop layout was one of the two
+candidates and it is done, so the **From the home screen** tile in Admin → Stats now
+decides only whether **Saved durability** (Upcoming/Past grouping, then a recovery link,
+S each) is worth doing. Give it real traffic first.
+
+**Sourcing is still the binding constraint and it got worse.** The catalog is down to **9
+upcoming events** from 14 — past events rolled off and were not replaced. A wide desktop
+layout shows a thin catalog more than a narrow one does. Nothing on the roadmap matters as
+much as this.
+
+### Still open, unchanged
+
+- **`deploy-probe@example.com` is still in `subscribers`.** Remove it from the Newsletter
+  tab before the first export.
+- **Newsletter** — blocked on the mailing address errand (CAN-SPAM, real lead time), then
+  Buttondown plus the draft-issue script.
+- **OPERATIONS §2** Web Analytics toggle · **§3** edge cache rule — `cf-cache-status` still
+  reads `DYNAMIC`, re-confirmed today · **§4** proxy shared secret, quiet window only.
+
+### Worth knowing next session
+
+- **There is still no frontend test runner.** The 400 tests are all backend and stayed
+  green throughout a session that touched nothing but the frontend — they prove nothing
+  about this work. Verification was a real browser driven against the deployed site, and
+  that is the only thing that can check a layout.
+- **Assert on values read from the page, not on constants typed into the test.** The sticky
+  test hardcoded 68 and 132; when the chrome grew to 72 and 156 it reported six failures
+  that were all the test being stale. It now reads the custom properties the CSS offsets
+  are built from.
+- **Stub `/interactions` when driving staging or production.** Both use the production API,
+  so any automated pass writes real counters otherwise.
+
+---
+
 ## Session close — 1 Aug 2026
 
 Eleven commits, all on `main` and `staging` (both at `0e93179`), all deployed and verified
@@ -85,10 +203,20 @@ The newsletter is the top priority; sourcing is the constraint underneath everyt
 | 2 | **Admin Newsletter tab** — see the list, export a window, remove an address | S | ✅ done |
 | 3 | **Mailing address for the newsletter footer** — John's errand, has a lead time | — | ⬜ |
 | 4 | **Buttondown account + draft-issue script** — query the week's events, emit markdown | M | ⬜ |
-| 5 | **Events, hard — recurring first** | ongoing | ⬜ |
-| 6 | **PWA** — manifest, icons, service worker | S–M | ⬜ |
-| 7 | **Desktop layout** — breakpoints, header nav, sidebar filters, two-column detail | M | ⬜ |
-| 8 | **Edge metadata injection** for `/e/:id` — makes desktop findable, fixes link previews | S | ⬜ |
+| 5 | **Events, hard — recurring first** | ongoing | ⬜ **the binding constraint, and 9 events is worse than when this was written** |
+| 6 | **PWA** — manifest, icons, service worker | S–M | ✅ done 1 Aug, `6bb7612`/`d9655de` |
+| 7 | **Desktop layout** — breakpoints, header nav, **top** filter bar, two-column detail | ~~M~~ **L** | ✅ done 7 Aug, `deaa480` |
+| 8 | **Edge metadata injection** for `/e/:id` — makes desktop findable, fixes link previews | S | ✅ done 1 Aug, `9f57a1b` — verified live today |
+
+Three corrections to the rows above, all found on 7 Aug:
+
+- **#6 and #8 were already done on 1 Aug and never ticked.** The manifest, icons and the
+  `/e/*` edge function all shipped that day; a `facebookexternalhit` fetch of a real event
+  URL returns an injected `<title>` and OG tags today.
+- **#7 was sized M and was really an L.** M assumed breakpoints only. What was asked for —
+  and built — is a designed desktop composition, which is a full session.
+- **#7's shape changed.** Filters went along the top as labelled dropdowns, not into a
+  sidebar, because the Eventbrite arrangement is the one people already know.
 
 ### Why this order
 

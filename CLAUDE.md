@@ -13,23 +13,35 @@ share by link. No accounts, no cookies, free in v1. Owner: John (GitHub: JLeePGP
 | Setup, architecture, analytics, design rationale | `README.md` |
 | Nothing | don't preload the others "for context" — they are long |
 
-## Status as of 1 Aug 2026
+## Status as of 7 Aug 2026
 
 **Live and working.** Site `https://vegasthisweekend.com`, API
-`https://api.vegasthisweekend.com`, ~12 real events, 400 tests passing, CI on every push.
+`https://api.vegasthisweekend.com`, **9 upcoming events**, 400 tests passing, CI on every
+push.
 
 **The swipe deck is gone.** Update 1 replaced it with a day-grouped list after launch
 feedback — 8 of 25 people asked for a list unprompted. If you find a reference to swiping,
 a card stack, dismissals or `stack_exhausted` anywhere, it is stale and should be fixed
 rather than followed. `BACKLOG.md` carries the reasoning.
 
+**There is a desktop layout now, and it is one app.** Shipped 7 Aug. Width decides, never
+the device — `useMediaQuery` plus a single `@media (min-width: 1024px)` block at the foot
+of `app.css`, with components forking behind a boolean where the structure differs. Below
+1024px nothing changed, and that is structural rather than incidental: every desktop rule
+is inside that one media query. Do not add desktop styling anywhere else.
+
+⚠ **The breakpoint is written down twice** — `DESKTOP_QUERY` in `constants.js` and the
+media query in `app.css` — because a custom property cannot be used in a media query.
+Change both or neither.
+
 **Also shipped 1 Aug:** newsletter capture and an admin Newsletter tab, series editing,
 recurrence patterns beyond weekly, per-event share previews via a Netlify edge function,
 and the app is installable to the home screen.
 
-**Build work is active**, but sourcing is the binding constraint: 31% of sessions reached
-the end of the catalog, and no layout change improves that. Read the session-close entry
-at the top of `BACKLOG.md` before planning anything.
+**Sourcing is the binding constraint and it is getting worse** — 31% of sessions reached
+the end of the catalog when there were 14 events, and there are now 9. No layout change
+improves that; the desktop work made it more visible, not better. Read the session-close
+entry at the top of `BACKLOG.md` before planning anything.
 
 Five things are built but switched off, all needing dashboard access John has and you
 don't: R2 credentials, the Cloudflare cache rule, the Web Analytics toggle, the proxy
@@ -78,5 +90,15 @@ This project has a history of changes that looked right and did nothing — a de
 selector, a link whose field was never serialised, a CSP that silently blocked every
 video. Check the deployed thing, not the diff. `curl -s -D - -o /dev/null <url>`; `curl -I`
 sends HEAD and FastAPI answers 405.
+
+**There is no frontend test runner.** The 400 tests are all backend, and they stay green
+through any amount of frontend breakage — never cite them as evidence a UI change works.
+Drive a real browser against the deployed URL instead; `frontend/node_modules/playwright-core`
+is already there and launches system Chrome with `{ channel: 'chrome' }`.
+
+**Stub `/interactions` when you automate against staging or production.** Both talk to the
+production API, so a scripted pass writes real counters into the data the roadmap is read
+from. Assert on values read out of the page, not on numbers typed into the test — offsets
+that were hardcoded in a test reported six false failures the first time the chrome grew.
 
 Cost and performance estimates here have been wrong more often than right. Measure.
